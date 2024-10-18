@@ -12,19 +12,20 @@ library(tidyverse)
 library(ggrepel)
 library(glue)
 library(gtools)
-#install.packages("reticulate")
 library(reticulate)
-# Directory root
-scenario <- "MII_variable_IIVT"
-# IIVT scenarios to include
-scen_list <- c(0)
+
+
 # Experiment name
-exp <- "idm_240924"
 exp <- "241013_20_max_infections"
 # Number of training batches
 training_batches <- 5
 # Batch size
 batch_size <- 200
+
+score_folder<-paste("output",exp,"performance/scores",sep='/')
+parameters_folder<-paste("output",exp,"performance/parameters",sep='/')
+GP_folder<-paste("output",exp,"performance/GP",sep='/')
+objectives_folder<-paste("output",exp,"objectives",sep='/')
 
 # Custom color palette
 my_pal <- c("gray",
@@ -41,51 +42,27 @@ pal_df <-data.frame(color=my_pal)
 pal_df$id <- 0:(nrow(pal_df)-1)
 ```
 
-Default IIVT-0 = "NONE"
+
 
 ```{r}
 # Read in log-likelihood scores
-scores <- read.csv(paste(paste(scenario,scen_list[1],sep="-"),"simulations","output",exp,'all_LL.csv',sep='/'))
+scores <- read.csv(paste("output",exp,'all_LL.csv',sep='/'))
 # Filter to exclude rows with missing (NA) scores
 scores %>% group_by(round,param_set) %>% mutate(has_na=sum(is.na(ll))>0) %>%
   filter(!has_na) %>%
   select(-has_na) -> scores
-# Assign IIVT
-all_scores <-  scores %>% mutate(iivt=scen_list[1])
-
-if(length(scen_list)>1){
-  for(i in 2:length(scen_list)){
-    remove(scores)
-    # read in log-likelihood scores
-    scores <- read.csv(paste(paste(scenario,scen_list[i],sep="-"),"simulations","output",exp,'all_LL.csv',sep='/'))
-    # remove missing (NA)
-    scores %>% group_by(round,param_set) %>% mutate(has_na=sum(is.na(ll))>0) %>%
-      filter(!has_na) %>%
-      select(-has_na) -> scores
-    # Combine rows with existing dataframe
-    all_scores <- rbind.data.frame(all_scores %>% select(param_set,site,metric,ll,baseline,my_weight,round,iivt),
-                                   scores %>% select(param_set,site,metric,ll,baseline,my_weight,round) %>% mutate(iivt=scen_list[i]))
-  }
-}
 
 all_scores <- all_scores %>% select(-colnames(all_scores)[grepl("Unnamed",colnames(all_scores))])
 
-iivt_levels <- c("NONE","PT vs AGE",
-                 "PT vs AGE INCREASING",
-                 "PT vs AGE IIV","CYTOKINE KILLING")
-
-all_scores$iivt <- factor(all_scores$iivt,levels=c(0,1,2,3,4),labels=iivt_levels)
 
 all_scores %>% ungroup() %>%
   #filter(round==0 & param_set==1) %>%
-  filter(round==0 & param_set==1 & iivt=="NONE") %>%
+  filter(round==0 & param_set==1) %>%
   select(site,metric,ll) -> d
 
 all_scores %>% ungroup() %>%
-  filter(round==0 & param_set==1 & iivt=="NONE") %>%
+  filter(round==0 & param_set==1) %>%
   select(site,metric,ll,baseline) -> d3
-
-#d3 %>% mutate(target_diff=ll/baseline) %>% arrange(target_diff) %>% filter(target_diff!=0)
 
 ```
 
@@ -125,7 +102,7 @@ all_scores %>%
   labs(linetype=NULL)-> bp
   
   print(bp)
-  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance/scores",paste("scores_total.png",sep="_"),sep='/'),bp,height = 8,width=8)
+  ggsave(paste(score_folder,paste("scores_total.png",sep="_"),sep='/'),bp,height = 8,width=8)
 
 # by round
 
@@ -157,7 +134,7 @@ all_scores %>%
   labs(linetype=NULL)-> bp
   
   print(bp)
-  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance/scores",paste("scores_total_by_round.png",sep="_"),sep='/'),bp,height = 8,width=8)
+  ggsave(paste(score_folder,paste("scores_total_by_round.png",sep="_"),sep='/'),bp,height = 8,width=8)
 
 ### All scores over time
 all_scores %>%
@@ -191,7 +168,7 @@ all_scores %>%
   labs(linetype=NULL)-> bp
   
   print(bp)
-  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance/scores",paste("scores_objective.png",sep="_"),sep='/'),bp,height =8,width=10)
+  ggsave(paste(score_folder,paste("scores_objective.png",sep="_"),sep='/'),bp,height =8,width=10)
 
 # by round only
 
@@ -226,7 +203,7 @@ all_scores %>%
   labs(linetype=NULL)-> bp
   
   print(bp)
-  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance/scores",paste("scores_objective_by_round.png",sep="_"),sep='/'),bp,height =8,width=10)
+  ggsave(paste(score_folder,paste("scores_objective_by_round.png",sep="_"),sep='/'),bp,height =8,width=10)
   
 ### All points performance (sum)
 
@@ -249,7 +226,6 @@ all_scores %>%
   geom_text(data=. %>% filter(weighted_ll>=1),
             aes(label=round(weighted_ll,2),group = weighted_ll),
                   position = position_stack(vjust = .5),size=3) +
-  #geom_vline(aes(xintercept = (training_batches-1) + 0.5,linetype="End Initialization"))+
   geom_text(aes(label=paste(ifelse(round<training_batches,paste("Init ",round),paste("Turbo ",round-training_batches+1)),"\n# ",param_set,sep=""),group = weighted_ll,y=-1.5),
             check_overlap = T,size=3) +
   labs(fill=NULL,linetype=NULL) +
@@ -277,7 +253,6 @@ all_scores %>%
   geom_text(data=. %>% filter(weighted_ll>=1),
             aes(label=round(weighted_ll,2),group = weighted_ll),
                   position = position_stack(vjust = .5),size=3) +
-  #geom_vline(aes(xintercept = (training_batches-1) + 0.5,linetype="End Initialization"))+
   geom_text(aes(label=paste(ifelse(round<training_batches,paste("Init ",round),paste("Turbo ",round-training_batches+1)),"\n# ",param_set,sep=""),group = weighted_ll,y=-1.5),
             check_overlap = T,size=3) +
   labs(fill=NULL,linetype=NULL) +
@@ -290,8 +265,7 @@ all_scores %>%
 library(patchwork)
   bp1 / bp2  -> bp
   
-  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,
-               "performance/scores",paste("scores_best_sets.png",sep="_"),sep='/'),bp,height =12,width=16)
+  ggsave(paste(score_folder,paste("scores_best_sets.png",sep="_"),sep='/'),bp,height =12,width=16)
 
 ```
 
@@ -301,46 +275,30 @@ library(patchwork)
 d %>% 
   rename(reference=ll) %>% 
   right_join(all_scores %>% ungroup(),by = c("metric","site")) %>% 
-  #select(param_set,round,metric,ll,site,metric,iivt) %>%
-  #left_join(reference %>% select(site,metric,baseline)) %>%
-  #mutate(baseline=ifelse(metric=="no_blood",-1,baseline)) %>%
-  select(param_set,round,ll,site,metric,iivt,reference,baseline) %>%
+  select(param_set,round,ll,site,metric,reference,baseline) %>%
   mutate(reference=ifelse(metric=="no_blood",-1,reference)) %>%
   mutate(ll2=ll/baseline) %>%
-  #mutate(ll2=ll/reference) %>% 
-  group_by(param_set,round,iivt) %>%
+  group_by(param_set,round) %>%
   mutate(worst=max(ll2,na.rm=T)) %>%
   mutate(score=sum(ll2,na.rm=T)) %>%
   ungroup() %>%
-  #filter(worst==ll2) %>%
-  #filter(!(round==0 & param_set==1)) %>%
   mutate(worst=ifelse(param_set==1 & round==0,Inf,worst))%>%
   mutate(score=ifelse(param_set==1 & round==0,Inf,score))%>%
-  group_by(iivt,round) %>%# count()
+  group_by(round) %>%# count()
   filter(score==min(score) | (param_set==1 & round==0)) %>%
-  arrange(iivt,round) %>%
+  arrange(round) %>%
   ungroup() %>%
   mutate(best=cummin(score)) %>%
   filter(score==best | (param_set==1&round==0)) -> track_sets
 
-for(i in unique(track_sets$best)){#unique(dd$iivt)){
+for(i in unique(track_sets$best)){
   track_sets %>% 
   filter(best==i) %>%
-  #ungroup() %>%
-  #mutate(best_worst=ifelse(is.finite(best_worst),best_worst,1)) %>%
-  #mutate(ll=ifelse(is.finite(best_worst),ll,1)) %>%
-  #filter(is.finite(best_worst))%>%
-  #filter(iivt == i) %>%
-  #filter(rank2==1) %>%
   ungroup() %>%
-  #mutate(ll2 = ifelse(ll2>=10000,Inf,ll2)) %>%
-  #filter(round==0) %>%
   mutate(plabel=ifelse(param_set==1 & round==0,"Default","")) %>%
-  #filter((param_set==1 & round==0)) %>%
   filter(plabel!="Default") %>%
   filter(metric!="no_blood") %>%
   ggplot(aes(x=gsub("_","\n",site))) + 
-  #coord_polar() +
   geom_hline(aes(yintercept=1,linetype="reference")) +
   geom_bar(aes(group=interaction(site,metric),
                 y=ll2,
@@ -349,24 +307,14 @@ for(i in unique(track_sets$best)){#unique(dd$iivt)){
             color="transparent", alpha=0.5,
             stat="identity",
            position=position_dodge(preserve = "single", width = 1.0)) +
-  #geom_line(aes(group=interaction(param_set,round,iivt),
-  #              y=ll2,
-  #              fill=paste(plabel,round,"#",param_set),
-  #              color=paste(plabel,round,"#",param_set)), 
-  #          position="identity") +
-  #geom_point(aes(y=ll2,color=paste(plabel,round,"#",param_set)), 
-  #          position="identity") +
-  facet_wrap(~paste(iivt,"round",round,"#",param_set),
+  facet_wrap(~paste("round",round,"#",param_set),
              nrow=2,scales="free_x") +
-  #scale_color_manual(values=my_pal[c(1,1,3,5)]) +
   scale_alpha_manual(values=c(0.5,1)) +
   scale_fill_brewer(palette="Set1") +
-    #scale_fill_manual(values=my_pal[c(3,5)]) +
   labs(color=NULL,fill=NULL, alpha=NULL, linetype=NULL) +
   guides(alpha="none",fill=guide_legend(nrow = 2))+
   xlab("site") + ylab("Worst Objective Score") +
   coord_cartesian(ylim=c(0,4))+
-  #scale_y_log10() +
   scale_linetype_manual(values=c(2)) -> bp
   
   bp + theme_minimal(base_size=16) +
@@ -374,7 +322,7 @@ for(i in unique(track_sets$best)){#unique(dd$iivt)){
     theme(legend.position="bottom") -> bp
   
   print(bp)
-  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance",paste(i,"performance.png",sep="_"),sep='/'),bp,height = 8,width=8)
+  ggsave(paste("output",exp,"performance",paste(i,"performance.png",sep="_"),sep='/'),bp,height = 8,width=8)
 }
 ```
 
@@ -382,24 +330,22 @@ for(i in unique(track_sets$best)){#unique(dd$iivt)){
 ```{r}
 # plot parameter search to visualize shrinking trust region / convergence / tradeoff
 
-all_scores %>% ungroup() %>% select(round,iivt) -> pp
+all_scores %>% ungroup() %>% select(round) -> pp
 
-pp %>% group_by(round,iivt) %>% count() %>% select(round,iivt) ->pp
+pp %>% group_by(round) %>% count() %>% select(round) ->pp
 
 for(i in 1:nrow(pp))
 {
-  # print(paste("Joining round",i,"out of",nrow(pp),"...","IIVT",
-  #             factor(pp$iivt[i],levels=c(0,1,2),labels=iivt_levels),"round",pp$round[i],sep=" "))
   if(i==1){
     
-    params <- read.csv(paste(paste(scenario,as.numeric(pp$iivt[i])-1,sep="-"),"simulations","output",exp,
+    params <- read.csv(paste("output",exp,
                              paste('LF',pp$round[i],sep='_'),"translated_params.csv",sep='/')) %>%
-              mutate(round=pp$round[i], iivt=pp$iivt[i])
+              mutate(round=pp$round[i])
   } else {
     rbind.data.frame(params,
-                    read.csv(paste(paste(scenario,as.numeric(pp$iivt[i])-1,sep="-"),"simulations","output",exp,
+                    read.csv(paste("output",exp,
                              paste('LF',pp$round[i],sep='_'),"translated_params.csv",sep='/')) %>%
-                    mutate(round=pp$round[i], iivt=pp$iivt[i])) -> params
+                    mutate(round=pp$round[i])) -> params
   }
 }
 
@@ -410,8 +356,7 @@ params %>%
   mutate(emod_value=gsub("tensor\\(","",emod_value)) %>%
   mutate(emod_value=gsub("\\)","",emod_value)) %>%
   mutate(parameter=gsub("_"," ",parameter)) -> params
-  #mutate(parameter=gsub("Base Gametocyte ","Base Gametocyte \n",parameter)) %>%
-  #mutate(parameter=gsub("Nonspecific Antibody ","Nonspecific Antibody \n",parameter)) -> params
+  
 
 params %>%
   mutate(parameter=gsub("Survival Rate","\nSurvival Rate",parameter))%>%
@@ -454,7 +399,7 @@ params %>%
   theme_minimal(base_size=14) +
   labs(color=NULL) + ylab("EMOD parameter value") + xlab("Batch #") -> pp
   pp
-  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance/parameters","emod_values.png",sep='/'),pp,height = 12,width=10)
+  ggsave(paste(parameters_folder,"emod_values.png",sep='/'),pp,height = 12,width=10)
 
   params %>%
   mutate(unit_value=as.numeric(unit_value))%>%
@@ -476,7 +421,7 @@ params %>%
   theme_minimal(base_size=14) +
   labs(color=NULL) + ylab("EMOD parameter value") + xlab("Batch #") -> pp
   pp
-  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance/parameters","unit_values.png",sep='/'),pp,height = 12,width=10)
+  ggsave(paste(parameters_folder,"unit_values.png",sep='/'),pp,height = 12,width=10)
 ```
 
 ### plotting vs. data 
@@ -484,6 +429,7 @@ params %>%
 
 ```{r}
 ##### Prevalence Plots #####
+
 
 ## Plot Namawala Annual Prevalence
 
@@ -493,32 +439,26 @@ ddmp <- track_sets %>% filter(site =="namawala_2001")
 for(i in 1:nrow(ddmp))
 {
   
-  tmp <- read.csv(paste(paste("MII_variable_IIVT-",as.numeric(ddmp$iivt[i])-1,sep=''),
-                 "/simulations/output/",exp,"/LF_",ddmp$round[i],
+  tmp <- read.csv(paste("output/",exp,"/LF_",ddmp$round[i],
                  "/SO/namawala_2001/inc_prev_data_final.csv",sep=''))
   tmp %>% right_join(ddmp[i,]) -> tmp
   if(i==1){
-    namawala_prev_df <- tmp %>% mutate(iivt = ddmp$iivt[i])
+    namawala_prev_df <- tmp 
   } else {
-    namawala_prev_df <- rbind.data.frame(namawala_prev_df,tmp %>% mutate(iivt=ddmp$iivt[i]))
+    namawala_prev_df <- rbind.data.frame(namawala_prev_df,tmp)
   }
 }
 
 # Read in reference data
 
-namawala_prev_ref <-read.csv(paste("MII_variable_IIVT-0/reference_datasets/namawala_annual_prev_by_age.csv",sep='')) 
+namawala_prev_ref <-read.csv("../reference_datasets/namawala_annual_prev_by_age.csv") 
 
 for(r in unique(namawala_prev_df$round)){
   
   namawala_prev_df %>%
   filter(round<=r) %>%
-  #filter(iivt=="NONE") %>%
-  #mutate(plab = ifelse(param_set==1 & round==0, "default",ifelse(rank2==1,"max","sum"))) %>%
   ggplot(aes(x=Age,y=Prevalence)) +
   theme_bw(base_size=16) +
-  #geom_line(data=namawala_prev_ref,
-  #           aes(x=agebin,y=prevalence),
-  #          linewidth=0.25) +
   geom_ribbon(data=namawala_prev_ref %>% 
                 mutate(se=sqrt(prevalence*(1-prevalence)/total_sampled)),
             aes(x=agebin,y=prevalence,
@@ -540,48 +480,32 @@ for(r in unique(namawala_prev_df$round)){
   labs(color="Round", shape=NULL) +
   guides(size="none",linewidth="none",linetype="none",shape="none")+
   ggtitle("NAMAWALA_2001",paste("Batch",r)) +
-  facet_wrap(~iivt) +
   scale_color_identity() +
   scale_x_continuous(breaks = unique(namawala_prev_df$Age),minor_breaks = NULL) -> pp
   
   print(pp)
 
-  ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste("Namawala_prevalence.png",sep="_"),sep='/'),pp,height = 8,width=8)
+  ggsave(paste(objectives_folder,paste("Namawala_prevalence.png",sep="_"),sep='/'),pp,height = 8,width=8)
 }
 
 namawala_prev_df %>%
-  filter(iivt=="NONE") %>%
   filter((round==0 & param_set==1) | round==max(round)) %>%
-  #mutate(plab = ifelse(param_set==1 & round==0, "default",ifelse(rank2==1,"max","sum"))) %>%
   ggplot(aes(x=Age,y=Prevalence)) +
   theme_bw(base_size=16) +
-  #geom_line(data=namawala_prev_ref,
-  #           aes(x=agebin,y=prevalence),
-  #          linewidth=0.25) +
-  # geom_ribbon(data=namawala_prev_ref %>% 
-  #               mutate(se=sqrt(prevalence*(1-prevalence)/total_sampled)),
-  #           aes(x=agebin,y=prevalence,
-  #               ymin=prevalence-1.96*se,
-  #               ymax=prevalence+1.96*se),
-  #           fill="black",alpha=0.1)+
   geom_line(aes(group=round,color=ifelse(round<training_batches,"gray", my_pal[round+1]),
                 linewidth=round==max(round))) + 
   geom_point(data=namawala_prev_ref,
              aes(x=agebin,y=prevalence,
                  shape="reference",size=total_sampled)) +
-  #geom_point(aes(color=ifelse(round<training_batches,"gray", my_pal[round+1]),size=round==max(round)))+ 
-  #scale_y_continuous(limits=c(0,1), breaks=seq(0,1,0.1)) +
-  #scale_size_manual(values=c(3,3))+
   scale_linewidth_manual(values=c(1.5,1.5))+
   labs(color="Round", shape=NULL) +
   guides(size="none",linewidth="none")+
   ggtitle("NAMAWALA_2001") +
-  facet_wrap(~iivt) +
   scale_color_identity() +
   theme_minimal(base_size=16) +
   scale_x_continuous(breaks = unique(namawala_prev_df$Age),minor_breaks = NULL) ->pp
 
-  ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste("Namawala_prevalence_best.png",sep="_"),sep='/'),pp,height = 8,width=8)
+  ggsave(paste(objectives_folder,paste("Namawala_prevalence_best.png",sep="_"),sep='/'),pp,height = 8,width=8)
 
 remove(namawala_prev_df)
 
@@ -593,32 +517,29 @@ mp_sites <- c("matsari_1970","rafin_marke_1970","sugungum_1970")
 ddmp <- track_sets %>% filter(site %in% mp_sites & metric=="prevalence")
 for(i in 1:nrow(ddmp))
 {
-  tmp <- read.csv(paste(paste("MII_variable_IIVT-",as.numeric(ddmp$iivt[i])-1,sep=''),
-                 "/simulations/output/",exp,"/LF_",ddmp$round[i],
+  tmp <- read.csv(paste("output/",exp,"/LF_",ddmp$round[i],
                  "/SO/",ddmp$site[i],"/prev_inc_by_age_month.csv",sep=''))
   tmp %>% right_join(ddmp[i,]) -> tmp
   if(i==1){
-    garki_prev_df <- tmp %>% mutate(iivt = ddmp$iivt[i]) %>% mutate(site=ddmp$site[i])
+    garki_prev_df <- tmp %>% mutate(site=ddmp$site[i])
   } else {
     garki_prev_df <- rbind.data.frame(garki_prev_df,tmp %>% 
-                                        mutate(iivt=ddmp$iivt[i]) %>%
                                         mutate(site=ddmp$site[i]))
   }
 }
 
 # Read in reference data
 
-garki_prev_ref <-read.csv(paste("/projects/b1139/calibration_scenarios/MII_variable_IIVT-0/reference_datasets/garki_prev_by_age_bin.csv",sep=''))
+garki_prev_ref <-read.csv(paste("../reference_datasets/garki_prev_by_age_bin.csv",sep=''))
 
 garki_prev_df %>%
   filter(round == max(round) | (param_set==1 & round==0)) %>%
   mutate(PfPR=ifelse(PfPR==0,NA,PfPR)) %>%
-  group_by(site,month,agebin,iivt,param_set,round,score,ll2) %>% 
+  group_by(site,month,agebin,param_set,round,score,ll2) %>% 
   summarize(prevalence=mean(PfPR,na.rm=T)) %>%
   filter(month %in% garki_prev_ref$month) %>%
   ggplot(aes(x=agebin, y=prevalence)) +
   facet_grid(site~month.abb[month]) +
-  #geom_point(aes(color=my_pal[round+1])) +
   geom_line(aes(group=interaction(round,param_set,lex.order = T),
                 color=ifelse(round<training_batches,"gray", my_pal[round+1])),size=1.5) +
   geom_point(data=garki_prev_ref %>% mutate(site=tolower(Site)),
@@ -629,7 +550,7 @@ garki_prev_df %>%
   theme(legend.position="bottom") +
   labs(size="sample size") -> pp
   
-  ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste("Garki_prevalence_best.png",sep="_"),sep='/'),pp,height = 8,width=8)
+  ggsave(paste(objectives_folder,paste("Garki_prevalence_best.png",sep="_"),sep='/'),pp,height = 8,width=8)
 
 
 for(r in unique(garki_prev_df$round)){
@@ -637,12 +558,11 @@ for(r in unique(garki_prev_df$round)){
   garki_prev_df %>%
   filter(round <=r) %>%
   mutate(PfPR=ifelse(PfPR==0,NA,PfPR)) %>%
-  group_by(site,month,agebin,iivt,param_set,round,score,ll2) %>% 
+  group_by(site,month,agebin,param_set,round,score,ll2) %>% 
   summarize(prevalence=mean(PfPR,na.rm=T)) %>%
   filter(month %in% garki_prev_ref$month) %>%
   ggplot(aes(x=agebin, y=prevalence)) +
   facet_grid(site~month.abb[month]) +
-  #geom_point(aes(color=my_pal[round+1])) +
   geom_line(aes(group=interaction(round,param_set,lex.order = T),
                 color=ifelse(round<training_batches,"gray", my_pal[round+1])),size=1.5) +
   geom_point(data=garki_prev_ref %>% mutate(site=tolower(Site)),
@@ -653,7 +573,7 @@ for(r in unique(garki_prev_df$round)){
   theme(legend.position="bottom") +
   labs(size="sample size") -> pp
   
-  ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste("Garki_prevalence.png",sep="_"),sep='/'),pp,height = 8,width=8)
+  ggsave(paste(objectives_folder,paste("Garki_prevalence.png",sep="_"),sep='/'),pp,height = 8,width=8)
 
   }
   
@@ -672,23 +592,20 @@ ddmp <- track_sets %>% filter(site %in% incidence_sites)
 for(i in 1:nrow(ddmp))
 {
   
-  tmp <- read.csv(paste(paste("MII_variable_IIVT-",as.numeric(ddmp$iivt[i])-1,sep=''),
-                 "/simulations/output/",exp,"/LF_",ddmp$round[i],
+  tmp <- read.csv(paste("..output/",exp,"/LF_",ddmp$round[i],
                  "/SO/",ddmp$site[i],"/inc_prev_data_final.csv",sep=''))
   tmp %>% right_join(ddmp[i,]) -> tmp
   if(i==1){
-    inc_df <- tmp %>% mutate(iivt = ddmp$iivt[i])
+    inc_df <- tmp 
   } else {
-    inc_df <- rbind.data.frame(inc_df,tmp %>% mutate(iivt=ddmp$iivt[i]))
+    inc_df <- rbind.data.frame(inc_df,tmp)
   }
 }
 
 
 # Read in reference data
 
-inc_ref <-read.csv(paste("/projects/b1139/calibration_scenarios/MII_variable_IIVT-0",
-                         "/reference_datasets/Cameron_age_incidence_prev.csv",
-                         sep=''))
+inc_ref <-read.csv("../reference_datasets/Cameron_age_incidence_prev.csv")
 
 inc_ref %>% filter(Site %in% incidence_sites) %>% select(Site,INC,INC_LAR,INC_UAR,POP) %>%
   mutate(Age=INC_UAR) -> inc_ref
@@ -696,15 +613,10 @@ inc_ref %>% filter(Site %in% incidence_sites) %>% select(Site,INC,INC_LAR,INC_UA
 for(s in unique(inc_df$site)){
   inc_df %>%
   filter(site==s) %>%
-  filter(iivt=="NONE") %>%
   filter((param_set==1 & round==0) | round==max(round)) %>%
-  #mutate(plab = ifelse(param_set==1 & round==0, "default",ifelse(rank2==1,"max","sum"))) %>%
-  #filter(plab %in% c("default","sum")) %>%
-  #mutate(plab=ifelse(plab=="sum","new",plab)) %>%
   ggplot(aes(x=Age,y=Incidence)) +
   ggtitle(toupper(s))+
   theme_minimal(base_size=16) +
-  #facet_grid(~gsub("vs","vs\n",iivt),scales="free") +
   geom_line(aes(group=interaction(round,param_set),color=ifelse(round<training_batches,"gray",my_pal[round+1]),
             linewidth=round==max(round),
             alpha=round==max(round))) +
@@ -720,19 +632,13 @@ for(s in unique(inc_df$site)){
   scale_size_continuous()+
   guides(alpha="none",shape="none") -> pp
   print(pp)
-  ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste(s,"incidence_best.png",sep="_"),sep='/'),pp,height = 6,width=6)
+  ggsave(paste(objectives_folder,paste(s,"incidence_best.png",sep="_"),sep='/'),pp,height = 6,width=6)
 
   inc_df %>%
   filter(site==s) %>%
-  #filter(iivt=="NONE") %>%
-  #filter((param_set==1 & round==0) | round==max(round)) %>%
-  #mutate(plab = ifelse(param_set==1 & round==0, "default",ifelse(rank2==1,"max","sum"))) %>%
-  #filter(plab %in% c("default","sum")) %>%
-  #mutate(plab=ifelse(plab=="sum","new",plab)) %>%
   ggplot(aes(x=Age,y=Incidence)) +
   ggtitle(toupper(s))+
   theme_minimal(base_size=16) +
-  #facet_grid(~gsub("vs","vs\n",iivt),scales="free") +
   geom_line(aes(group=interaction(round,param_set),color=ifelse(round<training_batches,"gray",my_pal[round+1]),
             linewidth=round==max(round),
             alpha=round==max(round))) +
@@ -749,7 +655,7 @@ for(s in unique(inc_df$site)){
   scale_size_continuous()+
   scale_linetype_manual(values=c(2,rep(1,length(unique(inc_df$round)))))-> pp
   print(pp)
-  ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste(s,"incidence.png",sep="_"),sep='/'),pp,height = 6,width=6)
+  ggsave(paste(objectives_folder,paste(s,"incidence.png",sep="_"),sep='/'),pp,height = 6,width=6)
 }
 
 
@@ -766,14 +672,12 @@ remove(inc_df)
 density_sites <- c("dapelogo_2007","laye_2007","matsari_1970","rafin_marke_1970","sugungum_1970")
 
 # Gather simulation outputs
-
 ddmp <- track_sets %>% filter(site %in% density_sites)
 
 ddmp %>% filter(round==max(round) | (param_set==1 & round==0)) -> ddmp
 
 
 # Lump data
-
 for(ss in 1:length(unique(ddmp$site)))
 {
   s=unique(ddmp$site)[ss]
@@ -783,25 +687,20 @@ for(ss in 1:length(unique(ddmp$site)))
   for(i in 1:nrow(sdmp))
   {
     print(paste(i,"of",nrow(sdmp)))    
-    iivt=sdmp$iivt[i]
     r=sdmp$round[i]
     ps=sdmp$param_set[i]
     
-    tmp <- read.csv(paste(paste("MII_variable_IIVT-",as.numeric(sdmp$iivt[i])-1,sep=''),
-                   "/simulations/output/",exp,"/LF_",sdmp$round[i],
+    tmp <- read.csv(paste("output/",exp,"/LF_",sdmp$round[i],
                    "/SO/",sdmp$site[i],"/parasite_densities_by_age_month.csv",sep='')) %>%
       filter(month %in% c(1,2,7,9,10) & param_set == ps)
     
     tmp %>% right_join(sdmp[i,]) -> tmp
     if(i==1 & ss==1){
-      dens_df <- tmp %>% mutate(iivt = sdmp$iivt[i])
+      dens_df <- tmp
     } else {
-      dens_df <- rbind.data.frame(dens_df,tmp %>% mutate(iivt=sdmp$iivt[i]))
+      dens_df <- rbind.data.frame(dens_df,tmp)
     }
   }
-  
-  # dens_df %>% ggplot(aes(x=densitybin,y=asexual_par_dens_freq)) +
-  #   facet_grid()
 }
   
 
@@ -810,9 +709,7 @@ for(s in unique(dens_df$Site)){
 
   if(s=="dapelogo_2007"){
     
-     ref_dens <- read.csv(paste("/projects/b1139/calibration_scenarios/MII_variable_IIVT-0",
-                             "/reference_datasets/par_dens_extract_Dapelogo_2007.csv",
-                             sep='')) %>% rename(site=Site)
+     ref_dens <- read.csv("../reference_datasets/par_dens_extract_Dapelogo_2007.csv") %>% rename(site=Site)
  
   
      dens_df %>%
@@ -820,9 +717,7 @@ for(s in unique(dens_df$Site)){
       filter((round==0 & param_set==1) | round==max(round)) %>%
       filter(month %in% ref_dens$month) %>%
       filter(Pop>0) %>%
-      #filter(densitybin>0) %>%
       filter(site==s) %>%
-      #mutate(densitybin = ifelse(densitybin==0, 0.1,densitybin)) %>%
       group_by(month,agebin,round,param_set,densitybin,site) %>%
       summarize(asexual_par_dens_freq=mean(asexual_par_dens_freq)) %>%
       ungroup() %>%
@@ -837,16 +732,14 @@ for(s in unique(dens_df$Site)){
       theme(axis.text.x=element_text(angle=45,hjust=1)) +
       xlab("Asexual Parasite Density") + ylab("Frequency") -> pp
       
-      ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste(s,"asexual_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
+      ggsave(paste(objectives_folder,paste(s,"asexual_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
 
      dens_df %>%
       filter(agebin>0.5) %>%
       filter((round==0 & param_set==1) | round==max(round)) %>%
       filter(month %in% ref_dens$month) %>%
       filter(Pop>0) %>%
-      #filter(densitybin>0) %>%
       filter(site==s) %>%
-      #mutate(densitybin = ifelse(densitybin==0, 0.1,densitybin)) %>%
       group_by(month,agebin,round,param_set,densitybin,site) %>%
       summarize(gametocyte_dens_freq=mean(gametocyte_dens_freq)) %>%
       ungroup() %>%
@@ -862,13 +755,11 @@ for(s in unique(dens_df$Site)){
       theme(axis.text.x=element_text(angle=45,hjust=1)) +
       xlab("Gametocyte Density") + ylab("Frequency") -> pp
       
-      ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste(s,"gametocyte_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
+      ggsave(paste(objectives_folder,paste(s,"gametocyte_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
     
   } else if(s=="laye_2007"){
     
-     ref_dens <- read.csv(paste("/projects/b1139/calibration_scenarios/MII_variable_IIVT-0",
-                             "/reference_datasets/par_dens_extract_Laye_2007.csv",
-                             sep='')) %>% rename(site=Site)
+     ref_dens <- read.csv("../reference_datasets/par_dens_extract_Laye_2007.csv") %>% rename(site=Site)
  
   
      dens_df %>%
@@ -876,9 +767,7 @@ for(s in unique(dens_df$Site)){
       filter((round==0 & param_set==1) | round==max(round)) %>%
       filter(month %in% ref_dens$month) %>%
       filter(Pop>0) %>%
-      #filter(densitybin>0.) %>%
       filter(tolower(site)==tolower(s)) %>%
-      #mutate(densitybin = ifelse(densitybin==0, 0.1,densitybin)) %>%
       group_by(month,agebin,round,param_set,densitybin,site) %>%
       summarize(asexual_par_dens_freq=mean(asexual_par_dens_freq)) %>%
       ungroup() %>%
@@ -895,16 +784,14 @@ for(s in unique(dens_df$Site)){
       theme(axis.text.x=element_text(angle=45,hjust=1)) +
       xlab("Asexual Parasite Density") + ylab("Frequency") +
       scale_size_continuous(range = c(0.5,3))
-     ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste(s,"asexual_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
+     ggsave(paste(objectives_folder,paste(s,"asexual_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
      
      dens_df %>%
       filter(agebin>0.5) %>%
       filter((round==0 & param_set==1) | round==max(round)) %>%
       filter(month %in% ref_dens$month) %>%
       filter(Pop>0) %>%
-      #filter(densitybin>0.) %>%
       filter(tolower(site)==tolower(s)) %>%
-      #mutate(densitybin = ifelse(densitybin==0, 0.1,densitybin)) %>%
       group_by(month,agebin,round,param_set,densitybin,site) %>%
       summarize(gametocyte_dens_freq=mean(gametocyte_dens_freq)) %>%
       ungroup() %>%
@@ -923,13 +810,11 @@ for(s in unique(dens_df$Site)){
       scale_size_continuous(range = c(0.5,3)) +
       theme(legend.position = "none")
      
-     ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste(s,"gametocyte_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
+     ggsave(paste(objectives_folder,paste(s,"gametocyte_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
     
   } else {
     
-     ref_dens <- read.csv(paste("/projects/b1139/calibration_scenarios/MII_variable_IIVT-0",
-                             "/reference_datasets/garki_par_dens_by_age_bin.csv",
-                             sep='')) %>% rename(site=Site)
+     ref_dens <- read.csv("../reference_datasets/garki_par_dens_by_age_bin.csv") %>% rename(site=Site)
      
      for(ds in unique(ref_dens$site)){
        dens_df %>%
@@ -937,9 +822,7 @@ for(s in unique(dens_df$Site)){
       filter((round==0 & param_set==1) | round==max(round)) %>%
       filter(month %in% ref_dens$month) %>%
       filter(Pop>0) %>%
-      #filter(densitybin>0.) %>%
       filter(tolower(site)==tolower(ds)) %>% 
-      #mutate(densitybin = ifelse(densitybin==0, 0.1,densitybin)) %>%
       group_by(month,agebin,round,param_set,densitybin,site) %>%
       summarize(asexual_par_dens_freq=mean(asexual_par_dens_freq)) %>%
       ungroup() %>%
@@ -959,16 +842,14 @@ for(s in unique(dens_df$Site)){
       scale_size_continuous(range = c(0.5,3)) +
       theme(legend.position = "none") -> pp
        
-      ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste(ds,"asexual_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
+      ggsave(paste(objectives_folder,paste(ds,"asexual_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
       
       dens_df %>%
       filter(agebin %in% unique(ref_dens$agebin)) %>%
       filter((round==0 & param_set==1) | round==max(round)) %>%
       filter(month %in% ref_dens$month) %>%
       filter(Pop>0) %>%
-      #filter(densitybin>0.) %>%
       filter(tolower(site)==tolower(ds)) %>%
-      #mutate(densitybin = ifelse(densitybin==0, 0.1,densitybin)) %>%
       group_by(month,agebin,round,param_set,densitybin,site) %>%
       summarize(gametocyte_dens_freq=mean(gametocyte_dens_freq)) %>%
       ungroup() %>%
@@ -987,7 +868,7 @@ for(s in unique(dens_df$Site)){
       xlab("Gametocyte Density") + ylab("Frequency") +
       scale_size_continuous(range = c(0.5,3)) +
       theme(legend.position = "none") -> pp
-      ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste(ds,"gameotcyte_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
+      ggsave(paste(objectives_folder,paste(ds,"gameotcyte_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
      }
   }
   }
@@ -1011,26 +892,20 @@ key = ddmp %>% arrange(-round,-param_set)
 key
 for(i in 1:nrow(key))
 {
-  iivt=which(iivt_levels==key$iivt[i])-1
   round=key$round[i]
   ps=key$param_set[i]
   site = key$site[i]
   
   print(paste(site,glue("round ",round," parameter set ",ps),sep=" --- "))
-  temp <- read.csv(paste("/projects/b1139/calibration_scenarios/MII_variable_IIVT-",
-                         iivt,
-                        "/simulations/output/",exp,
+  temp <- read.csv(paste("output/",exp,
                         "/LF_",round,
                         "/SO/",site,
                         "/infectiousness_by_age_density_month.csv",
                         sep='')) %>% 
           filter(param_set==ps & month %in% c(1,7,9)) %>%
-          mutate(round=round) %>%
-          mutate(iivt=iivt)
-    #select(-c(Pop,year))
-    
+          mutate(round=round) 
+
   temp$i <- i
-  #temp$site <- site
   if(!(exists("inf_df"))) {
     temp -> inf_df
   } else {
@@ -1044,12 +919,10 @@ for(i in 1:nrow(key))
 
 
 # Load laye reference data
-lay <- read.csv(file=paste("/projects/b1139/calibration_scenarios/MII_variable_IIVT-",iivt,"/reference_datasets/laye_infectiousness.csv",sep='')) %>%
+lay <- read.csv(file="../reference_datasets/laye_infectiousness.csv") %>%
   select(month,agebin,densitybin,fraction_infected_bin,freq_frac_infect,site)
 # Load dapelogo reference data
-dap <- read.csv(paste("/projects/b1139/calibration_scenarios/MII_variable_IIVT-",iivt,
-                             "/reference_datasets/dapelogo_infectiousness.csv",
-                             sep=''))%>% select(month,agebin,densitybin,fraction_infected_bin,freq_frac_infect,site)
+dap <- read.csv("../reference_datasets/dapelogo_infectiousness.csv")%>% select(month,agebin,densitybin,fraction_infected_bin,freq_frac_infect,site)
 # Combine reference datasets
 inf_ref <- rbind.data.frame(lay,dap) 
 remove(dap,lay)
@@ -1100,14 +973,13 @@ for(s in inf_sites[which(inf_sites %in% inf_df$Site)]){
         theme(legend.position="bottom",
               panel.grid.minor=element_blank(),
               axis.text.x=element_text(angle=45,hjust=1)) +
-        #scale_y_continuous(breaks=unique(inf_df$infectiousness_bin))
         xlab("Gametocyte Density") + ylab("Infectiousness Bin (%)") +
         labs(color=NULL, size=NULL,shape=NULL) -> pp
       pp 
-      ggsave(paste(paste(scenario,0,sep='-'),"simulations/output",exp,"objectives",paste(s,"infectiousness.png",sep="_"),sep='/'),pp,height = 10,width=10)
+      ggsave(paste(objectives_folder,paste(s,"infectiousness.png",sep="_"),sep='/'),pp,height = 10,width=10)
 }
 
-# remove(inf_df)
+remove(inf_df)
 ```
 
 
@@ -1116,18 +988,16 @@ for(s in inf_sites[which(inf_sites %in% inf_df$Site)]){
 ### this section of code requires that post-calibration lengthscale files have been generated
 ### to generate: run from /simulations post_calibration_analysis.py with length_scales_by_objective = True
 
-scenario="MII_variable_IIVT-0"
-
-ls_list <- list.files(glue(scenario,"/simulations/output/",exp,"/performance/GP"))
+ls_list <- list.files(glue("output/",exp,"/performance/GP"))
 ls_list <- ls_list[grepl("LS",ls_list)]
 
 if(length(ls_list)>1){
 
   for(ls in ls_list){
     if(!(exists("LS"))){
-      LS <- read.csv(glue(scenario,"/simulations/output/",exp,"/performance/GP/",ls))
+      LS <- read.csv(glue(GP_folder,'/',ls))
     } else {
-      tmp <- read.csv(glue(scenario,"/simulations/output/",exp,"/performance/GP/",ls))
+      tmp <- read.csv(glue(GP_folder,'/',ls))
       LS <- rbind.data.frame(LS,tmp)
     }
   }
@@ -1156,7 +1026,7 @@ if(length(ls_list)>1){
     xlab("") + ylab("") +
     labs(fill=NULL) 
   
-  ggsave(paste(scenario,"lengthscales.png",sep="_"),width=12,height=8)
+  ggsave(paste(GP_folder,"lengthscales.png",sep="/"),width=12,height=8)
   
   sensitivities %>%
     mutate(site=gsub('.{5}$', '', site))%>%
@@ -1175,7 +1045,7 @@ if(length(ls_list)>1){
     xlab("") + ylab("") +
     labs(fill=NULL) 
   
-  ggsave(paste(scenario,"ranked_lengthscales.png",sep="_"),width=12,height=8)
+  ggsave(paste(GP_folder,"ranked_lengthscales.png",sep="/"),width=12,height=8)
  
   
   sensitivities %>%
@@ -1199,7 +1069,7 @@ if(length(ls_list)>1){
     labs(fill=NULL) +
     coord_fixed()
   
-  ggsave(paste(scenario,"average_ranked_lengthscales.png",sep="_"),width=10,height=6)
+  ggsave(paste(GP_folder,"average_ranked_lengthscales.png",sep="/"),width=10,height=6)
     
 }
 ```
@@ -1219,4 +1089,3 @@ severe %>%
   
 
 ```
-
