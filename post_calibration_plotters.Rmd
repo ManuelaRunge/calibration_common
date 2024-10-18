@@ -12,13 +12,15 @@ library(tidyverse)
 library(ggrepel)
 library(glue)
 library(gtools)
+#install.packages("reticulate")
+library(reticulate)
 # Directory root
 scenario <- "MII_variable_IIVT"
 # IIVT scenarios to include
 scen_list <- c(0)
 # Experiment name
-exp <- "241013_20_max_infections"
 exp <- "idm_240924"
+exp <- "241013_20_max_infections"
 # Number of training batches
 training_batches <- 5
 # Batch size
@@ -50,11 +52,7 @@ scores %>% group_by(round,param_set) %>% mutate(has_na=sum(is.na(ll))>0) %>%
   select(-has_na) -> scores
 # Assign IIVT
 all_scores <-  scores %>% mutate(iivt=scen_list[1])
-```
 
-For additional IIVT scenarios
-
-```{r}
 if(length(scen_list)>1){
   for(i in 2:length(scen_list)){
     remove(scores)
@@ -71,24 +69,7 @@ if(length(scen_list)>1){
 }
 
 all_scores <- all_scores %>% select(-colnames(all_scores)[grepl("Unnamed",colnames(all_scores))])
-```
 
-Exploring scores
-
-```{r}
-all_scores %>% ungroup() %>% 
-  mutate(score=ll/baseline*my_weight) %>% 
-  group_by(param_set,round) %>% 
-  mutate(ms=min(score)) %>% 
-  ungroup() %>%
-  group_by(round,param_set) %>% summarize(score=sum(-1*score),worst_score=mean(-1*ms)) %>%
-  arrange(worst_score) %>% print(n=20) 
-
-all_scores %>% mutate(score=ll/baseline) %>% group_by(param_set,round) %>% summarize(ss=sum(score)) %>% arrange(ss)
-```
-
-
-```{r, out.width="100%"}
 iivt_levels <- c("NONE","PT vs AGE",
                  "PT vs AGE INCREASING",
                  "PT vs AGE IIV","CYTOKINE KILLING")
@@ -141,7 +122,10 @@ all_scores %>%
   theme_minimal(base_size=16) +
   scale_color_identity() +
   scale_linetype_manual(values=c(2,1)) +
-  labs(linetype=NULL)
+  labs(linetype=NULL)-> bp
+  
+  print(bp)
+  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance/scores",paste("scores_total.png",sep="_"),sep='/'),bp,height = 8,width=8)
 
 # by round
 
@@ -159,17 +143,21 @@ all_scores %>%
   ungroup() %>% 
   mutate(plotcolor=round-training_batches+2) %>% arrange(-plotcolor) %>%
   mutate(plotcolor=ifelse(plotcolor<1,1,plotcolor)) %>%
-  ggplot(aes(x=ps,y=score)) +
+  ggplot(aes(x=round,y=score)) +
   geom_hline(data=.%>%filter(ps==1),
              aes(yintercept=score,linetype="default"))+
   geom_hline(data=.%>%filter(ps!=1) %>% filter(score==min(score)),
              aes(yintercept=score,linetype="best"))+
-  geom_point(aes(color=my_pal[plotcolor]))+
-  ylab("Total Score") + xlab("#") +
+  geom_point(aes(color=my_pal[plotcolor]),
+             size=3)+
+  ylab("Total Score") + xlab("Round #") +
   theme_minimal(base_size=16) +
   scale_color_identity() +
   scale_linetype_manual(values=c(2,1)) +
-  labs(linetype=NULL)
+  labs(linetype=NULL)-> bp
+  
+  print(bp)
+  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance/scores",paste("scores_total_by_round.png",sep="_"),sep='/'),bp,height = 8,width=8)
 
 ### All scores over time
 all_scores %>%
@@ -186,19 +174,24 @@ all_scores %>%
   mutate(plotcolor=round-training_batches+2) %>% arrange(-plotcolor) %>%
   mutate(plotcolor=ifelse(plotcolor<1,1,plotcolor)) %>%
   filter(metric!="no_blood") %>%
-  ggplot(aes(x=ps,y=weighted_ll)) +
+  ggplot(aes(x=ps,y=log10(weighted_ll))) +
   facet_wrap(metric~site, scales="free_y") +
   geom_point(aes(color=my_pal[plotcolor]))+
   geom_hline(data=.%>%filter(ps==1),
-             aes(yintercept=weighted_ll,linetype="default"))+
+             aes(yintercept=log10(weighted_ll),linetype="default"))+
   geom_hline(data=.%>%filter(ps!=1) %>% filter(score==min(score)),
-             aes(yintercept=weighted_ll,linetype="best"))+
+             aes(yintercept=log10(weighted_ll),linetype="best"))+
   
-  ylab("Score") + xlab("#") +
+  ylab("Log10(Score)") + xlab("#") +
   theme_minimal(base_size=16) +
+  theme(legend.position=c(0.9,0),
+        legend.justification = c(1,0))+
   scale_color_identity() +
   scale_linetype_manual(values=c(2,1)) +
-  labs(linetype=NULL)
+  labs(linetype=NULL)-> bp
+  
+  print(bp)
+  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance/scores",paste("scores_objective.png",sep="_"),sep='/'),bp,height =8,width=10)
 
 # by round only
 
@@ -226,11 +219,14 @@ all_scores %>%
   geom_hline(data=.%>%filter(ps!=1) %>% filter(score==min(score)),
              aes(yintercept=weighted_ll,linetype="best"))+
   
-  ylab("Score") + xlab("Batch") +
+  ylab("Score") + xlab("Round #") +
   theme_minimal(base_size=16) +
   scale_color_identity() +
   scale_linetype_manual(values=c(2,1)) +
-  labs(linetype=NULL)
+  labs(linetype=NULL)-> bp
+  
+  print(bp)
+  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance/scores",paste("scores_objective_by_round.png",sep="_"),sep='/'),bp,height =8,width=10)
   
 ### All points performance (sum)
 
@@ -246,20 +242,57 @@ all_scores %>%
   ggplot(aes(x=round,y=weighted_ll)) +
   geom_bar(stat="identity",position="stack",aes(fill=metric, group=weighted_ll),color="white") +
   theme_minimal(base_size=16) +
-  ylab("Score") +
+  ylab("Score") + xlab("") +
   scale_x_continuous(breaks=c()) +
   scale_y_continuous(minor_breaks = seq(0,100,1)) +
   # Label component scores (unless very small, <0.5)
-  geom_text(data=. %>% filter(weighted_ll>=0.5),
+  geom_text(data=. %>% filter(weighted_ll>=1),
             aes(label=round(weighted_ll,2),group = weighted_ll),
-                  position = position_stack(vjust = .5),size=2.5) +
-  geom_vline(aes(xintercept = (training_batches-1) + 0.5,linetype="End Initialization"))+
-  geom_text(aes(label=paste("Batch ",round,"\n# ",param_set,sep=""),group = weighted_ll,y=-1),
+                  position = position_stack(vjust = .5),size=3) +
+  #geom_vline(aes(xintercept = (training_batches-1) + 0.5,linetype="End Initialization"))+
+  geom_text(aes(label=paste(ifelse(round<training_batches,paste("Init ",round),paste("Turbo ",round-training_batches+1)),"\n# ",param_set,sep=""),group = weighted_ll,y=-1.5),
+            check_overlap = T,size=3) +
+  labs(fill=NULL,linetype=NULL) +
+  theme(legend.position="top",
+        legend.box = "vertical") +
+  scale_linetype_manual(values=c(2)) +
+  scale_fill_brewer(palette="Set1") -> bp1
+  
+  print(bp1)
+  
+  all_scores %>%
+  mutate(weighted_ll=ll/baseline) %>%
+  mutate(ps=param_set + round*batch_size) %>%
+  group_by(ps) %>% mutate(score=sum(weighted_ll)) %>%
+  group_by(round) %>% filter(score==min(score)) %>%
+  filter(!(ps %in% bloodless)) %>%
+  filter(metric!="no_blood") %>%
+  ggplot(aes(x=round,y=weighted_ll)) +
+  geom_bar(stat="identity",position="stack",aes(fill=site, group=weighted_ll),color="white") +
+  theme_minimal(base_size=16) +
+  ylab("Score") + xlab("") +
+  scale_x_continuous(breaks=c()) +
+  scale_y_continuous(minor_breaks = seq(0,100,1)) +
+  # Label component scores (unless very small, <0.5)
+  geom_text(data=. %>% filter(weighted_ll>=1),
+            aes(label=round(weighted_ll,2),group = weighted_ll),
+                  position = position_stack(vjust = .5),size=3) +
+  #geom_vline(aes(xintercept = (training_batches-1) + 0.5,linetype="End Initialization"))+
+  geom_text(aes(label=paste(ifelse(round<training_batches,paste("Init ",round),paste("Turbo ",round-training_batches+1)),"\n# ",param_set,sep=""),group = weighted_ll,y=-1.5),
             check_overlap = T,size=3) +
   labs(fill=NULL,linetype=NULL) +
   theme(legend.position="bottom",
         legend.box = "vertical") +
-  scale_linetype_manual(values=c(2))
+  scale_linetype_manual(values=c(2)) +
+  scale_fill_brewer(palette="Set2") -> bp2
+  
+  
+library(patchwork)
+  bp1 / bp2  -> bp
+  
+  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,
+               "performance/scores",paste("scores_best_sets.png",sep="_"),sep='/'),bp,height =12,width=16)
+
 ```
 
 
@@ -280,10 +313,11 @@ d %>%
   mutate(score=sum(ll2,na.rm=T)) %>%
   ungroup() %>%
   #filter(worst==ll2) %>%
-  filter(!(round==0 & param_set==1)) %>%
+  #filter(!(round==0 & param_set==1)) %>%
   mutate(worst=ifelse(param_set==1 & round==0,Inf,worst))%>%
+  mutate(score=ifelse(param_set==1 & round==0,Inf,score))%>%
   group_by(iivt,round) %>%# count()
-  filter(score==min(score)) %>%
+  filter(score==min(score) | (param_set==1 & round==0)) %>%
   arrange(iivt,round) %>%
   ungroup() %>%
   mutate(best=cummin(score)) %>%
@@ -387,105 +421,62 @@ params %>%
   mutate(parameter=gsub("Nonspecific Anti","Nonspecific Anti-\n",parameter)) -> params
 
 
+param_levels <- unique(params$parameter)
+param_levels <- param_levels[c(1,5,10,7,6,11,12,
+                               4,2,9,3,
+                               14,13,8,17,15,16)]
 
 best_round <- max(track_sets$round)
 best_ps <- max(track_sets$param_set[track_sets$round==best_round])
-  
-all_scores %>% mutate(score=ll/baseline) %>% group_by(param_set,round) %>% summarize(score=sum(score)) %>% arrange(score)
 
 
 params %>%
   mutate(emod_value=ifelse(transformation=="log",
                            log10(as.numeric(emod_value)),
                            as.numeric(emod_value)))%>%
-  mutate(parameter=ifelse(transformation=="log",paste(parameter,"(Log)"),parameter)) %>%
   ggplot(aes(x=round)) +
-  facet_wrap(~parameter,scales="free_y",ncol=3) +
-  geom_point(data=.%>% filter(round==0 & param_set==1),
-             aes(y=as.numeric(emod_value),color="default"))+
-  geom_point(data=.%>% filter(round==best_round & param_set==best_ps),
-             aes(y=as.numeric(emod_value),color="best"))+
-  geom_point(data=.%>%group_by(parameter,round) %>%summarize(median=median(emod_value)),
-             aes(y=median), size=1)+
-  geom_segment(data=.%>%group_by(parameter,round) %>%summarize(LQR=quantile(emod_value,0.25),
-                                                               UQR=quantile(emod_value,0.75)),
+  facet_wrap(~factor(parameter,levels=param_levels),
+             scales="free_y",ncol=3) +
+    geom_segment(data=.%>%group_by(parameter,round) %>%
+                   summarize(LQR=quantile(emod_value,0.25),
+                             UQR=quantile(emod_value,0.75)),
              aes(xend=round,y=LQR,yend=UQR), linewidth=0.5)+
-  #geom_boxplot(aes(group=round),outliers = F)  +
+   geom_point(data=.%>%group_by(parameter,round,transformation) %>%summarize(median=median(emod_value)),
+             aes(y=median,shape=transformation),fill="white")+
+  geom_point(data=.%>% filter(round==0 & param_set==1),
+             aes(y=as.numeric(emod_value),color="default",shape=transformation),fill="white")+
+  geom_point(data=.%>% filter(round==best_round & param_set==best_ps),
+             aes(y=as.numeric(emod_value),color="best",shape=transformation),fill="white")+
+ 
+  scale_shape_manual(values=c(16,21))+
+  scale_color_brewer(palette="Set1") +
 
   theme_minimal(base_size=14) +
   labs(color=NULL) + ylab("EMOD parameter value") + xlab("Batch #") -> pp
   pp
-  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"parameters",paste(i,"emod_values.png",sep="_"),sep='/'),pp,height = 12,width=10)
+  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance/parameters","emod_values.png",sep='/'),pp,height = 12,width=10)
 
   params %>%
   mutate(unit_value=as.numeric(unit_value))%>%
   mutate(parameter=parameter) %>%
   ggplot(aes(x=round)) +
-  facet_wrap(~parameter,scales="free_y",ncol=3) +
-  geom_point(data=.%>% filter(round==0 & param_set==1),
+  facet_wrap(~factor(parameter,levels=param_levels),scales="free_y",ncol=3) +
+  geom_segment(data=.%>%group_by(parameter,round) %>%
+                 summarize(LQR=quantile(unit_value,0.25),
+                           UQR=quantile(unit_value,0.75)),
+             aes(xend=round,y=LQR,yend=UQR), linewidth=0.5)+
+    geom_point(data=.%>%group_by(parameter,round) %>%summarize(median=median(unit_value)),
+             aes(y=median), size=1)+
+    geom_point(data=.%>% filter(round==0 & param_set==1),
              aes(y=as.numeric(unit_value),color="default"))+
   geom_point(data=.%>% filter(round==best_round & param_set==best_ps),
              aes(y=as.numeric(unit_value),color="best"))+
-  geom_point(data=.%>%group_by(parameter,round) %>%summarize(median=median(unit_value)),
-             aes(y=median), size=1)+
-  geom_segment(data=.%>%group_by(parameter,round) %>%summarize(LQR=quantile(unit_value,0.25),
-                                                               UQR=quantile(unit_value,0.75)),
-             aes(xend=round,y=LQR,yend=UQR), linewidth=0.5)+
   scale_y_continuous(limits=c(0,1))+
+  scale_color_brewer(palette="Set1") +
   theme_minimal(base_size=14) +
   labs(color=NULL) + ylab("EMOD parameter value") + xlab("Batch #") -> pp
   pp
-  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"parameters",paste(i,"unit_values.png",sep="_"),sep='/'),pp,height = 12,width=10)
-
-
-ps <-unique(params$parameter) 
-  
-pls <-  c(1,5,10,6,11,12,7,17,
-               8,13,14,15,16,
-               2,3,4,9,18,19,20)
-
-
-params %>%
-  filter(round<=50) %>%
-  #filter(iivt==0) %>%
-  mutate(id=as.numeric(factor(parameter)))%>%
-  mutate(iter=ifelse(round<training_batches,"Training",paste("TuRBO", round-training_batches+1))) %>%
-  filter(parameter!="InnateImmuneDistributionFlag") %>% 
-  mutate(emod_value=ifelse(transformation=="log" | parameter==" Nonspecific Types",
-                           log10(as.numeric(emod_value)),as.numeric(emod_value)))%>%
-  group_by(iter,iivt,parameter,round) %>%
-  summarize(lowest=min(emod_value),
-            highest=max(emod_value))%>%
-  ungroup() %>%
-  #filter(grepl("Falciparum",parameter)) %>%
-  ggplot(aes(x=round)) +
-  theme_bw(base_size=12) +
-  xlab("round") + ylab("EMOD parameter value") +
-  geom_hline(data=params %>% filter(round==0 & param_set==1 & iivt=="NONE"),
-             aes(yintercept=ifelse(transformation=="log" | parameter==" Nonspecific Types",
-                                   log10(as.numeric(emod_value)),as.numeric(emod_value)),linetype="default")) +
-  geom_segment(aes(xend=round,y=lowest,yend=highest,color=factor(iter,levels=c("Training",paste("TuRBO",seq(1,max(params$round)))))),
-               linewidth=2) +
-  #geom_point(aes(color=factor(round)))+
-  #facet_grid(gsub("InnateImmuneDistribution","Innate\nImmune\nDistribution\n",gsub(" ", "\n",parameter))~iivt,
-  #          scales="free") +
-  # facet_wrap(~gsub("Falciparum","",
-  #                  gsub("Growth","\nGrowth",
-  #                  gsub("Survival","\nSurvival",
-  #                  gsub("Base","",
-  #                  gsub("InnateImmuneDistribution","Innate\nImmune\nDistribution\n",paste(parameter)))))),
-  #           scales="free_y",ncol=5) +
-  facet_wrap(~factor(parameter,levels=ps[pls], labels=ps[pls][!is.na(ps[pls])]),
-             scales="free_y",) +
-  labs(color=NULL,linetype=NULL) +
-  theme_minimal(base_size=12) +
-  theme(legend.position=c(1,0),
-        legend.justification =c(1,0)) +
-  guides(color="none")+#,guide_legend(ncol=12,byrow=T)) +
-  scale_color_manual(values=my_pal) +
-  scale_linetype_manual(values=2) +
-  xlab("Batch")
-
+  ggsave(paste(paste(scenario,0,sep="-"),"simulations/output",exp,"performance/parameters","unit_values.png",sep='/'),pp,height = 12,width=10)
 ```
 
 ### plotting vs. data 
@@ -493,7 +484,6 @@ params %>%
 
 ```{r}
 ##### Prevalence Plots #####
-
 
 ## Plot Namawala Annual Prevalence
 
@@ -695,8 +685,6 @@ for(i in 1:nrow(ddmp))
 
 
 # Read in reference data
-
-training_batches=5
 
 inc_ref <-read.csv(paste("/projects/b1139/calibration_scenarios/MII_variable_IIVT-0",
                          "/reference_datasets/Cameron_age_incidence_prev.csv",
@@ -943,14 +931,14 @@ for(s in unique(dens_df$Site)){
                              "/reference_datasets/garki_par_dens_by_age_bin.csv",
                              sep='')) %>% rename(site=Site)
      
-     for(s in unique(ref_dens$Site)){
+     for(ds in unique(ref_dens$site)){
        dens_df %>%
       filter(agebin %in% unique(ref_dens$agebin)) %>%
       filter((round==0 & param_set==1) | round==max(round)) %>%
       filter(month %in% ref_dens$month) %>%
       filter(Pop>0) %>%
       #filter(densitybin>0.) %>%
-      filter(tolower(site)==tolower(s)) %>%
+      filter(tolower(site)==tolower(ds)) %>% 
       #mutate(densitybin = ifelse(densitybin==0, 0.1,densitybin)) %>%
       group_by(month,agebin,round,param_set,densitybin,site) %>%
       summarize(asexual_par_dens_freq=mean(asexual_par_dens_freq)) %>%
@@ -960,9 +948,9 @@ for(s in unique(dens_df$Site)){
       geom_line(aes(group=interaction(round,agebin),
                      color=my_pal[as.integer(round)+1]),
                 linewidth=1.5)+
-      geom_point(data=ref_dens %>% filter(tolower(site)==tolower(s)),
+      geom_point(data=ref_dens %>% filter(tolower(site)==tolower(ds)),
                  aes(size=bin_total_asex))+
-      ggtitle(paste(s)) +
+      ggtitle(paste(ds)) +
       scale_x_log10(breaks=unique(ref_dens$densitybin)) +
       scale_color_identity() +
       theme_minimal(base_size=16) +
@@ -971,7 +959,7 @@ for(s in unique(dens_df$Site)){
       scale_size_continuous(range = c(0.5,3)) +
       theme(legend.position = "none") -> pp
        
-      ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste(s,"asexual_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
+      ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste(ds,"asexual_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
       
       dens_df %>%
       filter(agebin %in% unique(ref_dens$agebin)) %>%
@@ -979,7 +967,7 @@ for(s in unique(dens_df$Site)){
       filter(month %in% ref_dens$month) %>%
       filter(Pop>0) %>%
       #filter(densitybin>0.) %>%
-      filter(tolower(site)==tolower(s)) %>%
+      filter(tolower(site)==tolower(ds)) %>%
       #mutate(densitybin = ifelse(densitybin==0, 0.1,densitybin)) %>%
       group_by(month,agebin,round,param_set,densitybin,site) %>%
       summarize(gametocyte_dens_freq=mean(gametocyte_dens_freq)) %>%
@@ -989,9 +977,9 @@ for(s in unique(dens_df$Site)){
       geom_line(aes(group=interaction(round,agebin),
                      color=my_pal[as.integer(round)+1]),
                 linewidth=1.5)+
-      geom_point(data=ref_dens %>% filter(tolower(site)==tolower(s)),
+      geom_point(data=ref_dens %>% filter(tolower(site)==tolower(ds)),
                  aes(size=bin_total_asex))+
-      ggtitle(paste(s)) +
+      ggtitle(paste(ds)) +
       scale_x_log10(breaks=unique(ref_dens$densitybin)) +
       scale_color_identity() +
       theme_minimal(base_size=16) +
@@ -999,11 +987,8 @@ for(s in unique(dens_df$Site)){
       xlab("Gametocyte Density") + ylab("Frequency") +
       scale_size_continuous(range = c(0.5,3)) +
       theme(legend.position = "none") -> pp
-       
-      ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste(s,"gameotcyte_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
+      ggsave(paste(paste(scenario,"-",as.numeric(ddmp$iivt[i])-1,sep=''),"simulations/output",exp,"objectives",paste(ds,"gameotcyte_densities.png",sep="_"),sep='/'),pp,height = 8,width=8)
      }
-     
-     
   }
   }
   
@@ -1122,29 +1107,27 @@ for(s in inf_sites[which(inf_sites %in% inf_df$Site)]){
       ggsave(paste(paste(scenario,0,sep='-'),"simulations/output",exp,"objectives",paste(s,"infectiousness.png",sep="_"),sep='/'),pp,height = 10,width=10)
 }
 
-
 # remove(inf_df)
 ```
 
 
 ```{r}
-scen <- "MII_variable_IIVT-0"
-#scen <- "MII_variable_IIVT-3"
-exp <- "idm_240924"
-#exp <- "hyperparam_240804"
 
-scenario_list=c("MII_variable_IIVT-0")
+### this section of code requires that post-calibration lengthscale files have been generated
+### to generate: run from /simulations post_calibration_analysis.py with length_scales_by_objective = True
 
-for(scen in scenario_list){
-  
-  ls_list <- list.files(glue(scen,"/simulations/output/",exp))
-  ls_list <- ls_list[grepl("LS",ls_list)]
+scenario="MII_variable_IIVT-0"
+
+ls_list <- list.files(glue(scenario,"/simulations/output/",exp,"/performance/GP"))
+ls_list <- ls_list[grepl("LS",ls_list)]
+
+if(length(ls_list)>1){
 
   for(ls in ls_list){
     if(!(exists("LS"))){
-      LS <- read.csv(glue(scen,"/simulations/output/",exp,"/",ls))
+      LS <- read.csv(glue(scenario,"/simulations/output/",exp,"/performance/GP/",ls))
     } else {
-      tmp <- read.csv(glue(scen,"/simulations/output/",exp,"/",ls))
+      tmp <- read.csv(glue(scenario,"/simulations/output/",exp,"/performance/GP/",ls))
       LS <- rbind.data.frame(LS,tmp)
     }
   }
@@ -1173,7 +1156,7 @@ for(scen in scenario_list){
     xlab("") + ylab("") +
     labs(fill=NULL) 
   
-  ggsave(paste(scen,"lengthscales.png",sep="_"),width=12,height=8)
+  ggsave(paste(scenario,"lengthscales.png",sep="_"),width=12,height=8)
   
   sensitivities %>%
     mutate(site=gsub('.{5}$', '', site))%>%
@@ -1187,12 +1170,12 @@ for(scen in scenario_list){
     scale_fill_distiller(palette="RdGy",direction = 1) +
     #facet_grid(metric~.,scales="free") +
     xlab("") + ylab("") +
-    theme_minimal(base_size=16)+
+    theme_minimal(base_size=16) +
     theme(axis.text.x=element_text(angle=45,hjust=1)) +
     xlab("") + ylab("") +
     labs(fill=NULL) 
   
-  ggsave(paste(scen,"ranked_lengthscales.png",sep="_"),width=12,height=8)
+  ggsave(paste(scenario,"ranked_lengthscales.png",sep="_"),width=12,height=8)
  
   
   sensitivities %>%
@@ -1207,7 +1190,7 @@ for(scen in scenario_list){
     ggplot(aes(x=factor(id,levels=plevels,labels=gsub("\n","",gsub("-\n"," ",params$parameter[plevels]))),
                y=factor(metric,levels=c("prevalence","[asexual parasites]","[gametocytes]",
                                         "infectiousness","incidence")))) +
-    theme_minimal(base_size=16)+
+    theme_minimal(base_size=16) +
     geom_tile(color="white",
               aes(fill=value)) +
     scale_fill_distiller(palette="RdGy",direction = 1) +
@@ -1216,9 +1199,9 @@ for(scen in scenario_list){
     labs(fill=NULL) +
     coord_fixed()
   
-  ggsave(paste(scen,"average_ranked_lengthscales.png",sep="_"),width=10,height=6)
+  ggsave(paste(scenario,"average_ranked_lengthscales.png",sep="_"),width=10,height=6)
     
-  }
+}
 ```
 
 ```{r,eval=F,include=F}
