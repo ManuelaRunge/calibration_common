@@ -52,7 +52,7 @@ scores %>% group_by(round,param_set) %>% mutate(has_na=sum(is.na(ll))>0) %>%
   filter(!has_na) %>%
   select(-has_na) -> scores
 
-all_scores <- all_scores %>% select(-colnames(all_scores)[grepl("Unnamed",colnames(all_scores))])
+all_scores <- scores %>% select(-colnames(scores)[grepl("Unnamed",colnames(scores))])
 
 
 all_scores %>% ungroup() %>%
@@ -1089,3 +1089,4 @@ severe %>%
   
 
 ```
+
