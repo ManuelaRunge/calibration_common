@@ -162,8 +162,3 @@ if __name__=="__main__":
         exclude_count=args.exclude_count,
         plot_timers=args.plot_timers
     )
-      post_calibration_analysis(experiment='241013_20_max_infections',
-                                length_scales_by_objective=True,
-                                plot_length_scales=True,
-                                plot_predictions=True, exclude_count=1000,
-                                plot_timers=True)
