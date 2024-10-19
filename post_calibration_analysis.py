@@ -107,8 +107,8 @@ def plot_length_scales(experiment=''):
 
 def post_calibration_analysis(experiment='',length_scales_by_objective=True,plot_length_scales=True,plot_predictions=True,exclude_count=0,plot_timers=True):
                                 
-    os.makedirs("/".join((scenario,"simulations","output",experiment,"performance","GP")),exist_ok=True)
-    print(" ".join(("Loading botorch objects for scenario",scenario,"experiment",experiment)))
+    os.makedirs("/".join((herepath,"output",experiment,"performance","GP")),exist_ok=True)
+    print(" ".join(("Loading botorch objects for experiment",experiment)))
     
     if plot_predictions:
         plot_predictions(experiment,exclude_count)
