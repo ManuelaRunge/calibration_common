@@ -105,16 +105,16 @@ def plot_length_scales(experiment=''):
     plt.savefig(os.path.join(herepath,'output',experiment,"performance/GP/length_scales.pdf"))  
     return
 
-def post_calibration_analysis(experiment='',length_scales_by_objective=True,plot_length_scales=True,plot_predictions=True,exclude_count=0,plot_timers=True):
+def post_calibration_analysis(experiment='',length_scales_by_objective=True,length_scales_plot=True,prediction_plot=True,exclude_count=0,timer_plot=True):
                                 
     os.makedirs("/".join((herepath,"output",experiment,"performance","GP")),exist_ok=True)
     print(" ".join(("Loading botorch objects for experiment",experiment)))
     
-    if plot_predictions:
+    if prediction_plot:
         plot_predictions(experiment,exclude_count)
-    if plot_timers:
+    if timer_plot:
         plot_timers(experiment)
-    if plot_length_scales:
+    if length_scales_plot:
         plot_length_scales(experiment)
     if length_scales_by_objective:
         # Fit single-task GP  to all site-metric objectives in all_scores.csv
@@ -139,15 +139,15 @@ if __name__=="__main__":
 
     # Add arguments
     parser.add_argument('--experiment', type=str, required=True, help='Experiment label')
-    parser.add_argument('--length_scales_by_objective', type=bool, default=True, 
+    parser.add_argument('--length_scales_by_objective', type=bool, default=True, action='store_true', 
                         help='Whether to calculate length scales by objective')
-    parser.add_argument('--plot_length_scales', type=bool, default=True, 
+    parser.add_argument('--length_scales_plot', type=bool, default=True,action='store_true', 
                         help='Whether to plot length scales')
-    parser.add_argument('--plot_predictions', type=bool, default=True, 
+    parser.add_argument('--prediction_plot', type=bool, default=True,action='store_true',  
                         help='Whether to plot predictions')
     parser.add_argument('--exclude_count', type=int, default=1000, 
                         help='Count to exclude from analysis')
-    parser.add_argument('--plot_timers', type=bool, default=True, 
+    parser.add_argument('--timer_plot', type=bool, default=True,action='store_true',  
                         help='Whether to plot timers')
 
     # Parse the arguments
@@ -157,8 +157,8 @@ if __name__=="__main__":
     post_calibration_analysis(
         experiment=args.experiment,
         length_scales_by_objective=args.length_scales_by_objective,
-        plot_length_scales=args.plot_length_scales,
-        plot_predictions=args.plot_predictions,
+        length_scales_plot=args.length_scales_plot,
+        prediction_plot=args.prediction_plot,
         exclude_count=args.exclude_count,
-        plot_timers=args.plot_timers
+        timer_plot=args.timer_plot
     )
