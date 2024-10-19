@@ -35,7 +35,7 @@ def plot_predictions(experiment='',exclude_count=0):
         plt.figure(figsize=(10, 6))
         plt.plot(x, mean, label='Predicted Mean', color='blue')
         # Plot the confidence interval
-        plt.fill_between(x, mean - confidence_interval, mean + confidence_interval, color='blue', alpha=0.2, label='95% Confidence Interval')
+        #plt.fill_between(x, mean - confidence_interval, mean + confidence_interval, color='blue', alpha=0.2, label='95% Confidence Interval')
         plt.plot(x,Y,label='Observation',marker='o',color='blue',linestyle='')
         # Add labels and title
         plt.xlabel('Index')
@@ -139,15 +139,15 @@ if __name__=="__main__":
 
     # Add arguments
     parser.add_argument('--experiment', type=str, required=True, help='Experiment label')
-    parser.add_argument('--length_scales_by_objective', type=bool, default=True, action='store_true', 
+    parser.add_argument('--length_scales_by_objective', default=False, action='store_true', 
                         help='Whether to calculate length scales by objective')
-    parser.add_argument('--length_scales_plot', type=bool, default=True,action='store_true', 
+    parser.add_argument('--length_scales_plot', default=False,action='store_true', 
                         help='Whether to plot length scales')
-    parser.add_argument('--prediction_plot', type=bool, default=True,action='store_true',  
+    parser.add_argument('--prediction_plot', default=False,action='store_true',  
                         help='Whether to plot predictions')
     parser.add_argument('--exclude_count', type=int, default=1000, 
                         help='Count to exclude from analysis')
-    parser.add_argument('--timer_plot', type=bool, default=True,action='store_true',  
+    parser.add_argument('--timer_plot', default=False,action='store_true',  
                         help='Whether to plot timers')
 
     # Parse the arguments
