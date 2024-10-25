@@ -14,18 +14,22 @@ library(glue)
 library(gtools)
 library(reticulate)
 
-
 # Experiment name
-exp <- "241013_20_max_infections"
+exp <- "241021_test_constantRisk4"
 # Number of training batches
-training_batches <- 5
+training_batches <- 1
 # Batch size
-batch_size <- 200
-
+batch_size <- 2
+performance_folder<-paste("output",exp,"performance",sep='/')
+if(!(dir.exists(performance_folder))){dir.create(performance_folder)}
 score_folder<-paste("output",exp,"performance/scores",sep='/')
+if(!(dir.exists(score_folder))){dir.create(score_folder)}
 parameters_folder<-paste("output",exp,"performance/parameters",sep='/')
+if(!(dir.exists(parameters_folder))){dir.create(parameters_folder)}
 GP_folder<-paste("output",exp,"performance/GP",sep='/')
+if(!(dir.exists(GP_folder))){dir.create(GP_folder)}
 objectives_folder<-paste("output",exp,"objectives",sep='/')
+if(!(dir.exists(objectives_folder))){dir.create(objectives_folder)}
 
 # Custom color palette
 my_pal <- c("gray",
@@ -152,7 +156,7 @@ all_scores %>%
   mutate(plotcolor=ifelse(plotcolor<1,1,plotcolor)) %>%
   filter(metric!="no_blood") %>%
   ggplot(aes(x=ps,y=log10(weighted_ll))) +
-  facet_wrap(metric~site, scales="free_y") +
+  facet_wrap(metric~site) +
   geom_point(aes(color=my_pal[plotcolor]))+
   geom_hline(data=.%>%filter(ps==1),
              aes(yintercept=log10(weighted_ll),linetype="default"))+
@@ -267,6 +271,50 @@ library(patchwork)
   
   ggsave(paste(score_folder,paste("scores_best_sets.png",sep="_"),sep='/'),bp,height =12,width=16)
 
+  
+  # Valley Plot
+  
+  all_scores %>% 
+    filter(!bloodless)%>%
+    group_by(param_set,round) %>% 
+    mutate(score=sum(weighted_ll),
+              worst=max(weighted_ll)) %>%
+    ungroup() %>%
+    filter(worst==weighted_ll) %>% 
+    mutate(score_rank=rank(score)) %>%
+    ggplot(aes(x=score_rank,y=worst)) +
+    theme_minimal(base_size=14) +
+    geom_point(aes(color=metric))  +
+    facet_wrap(~site) +
+    theme(legend.position = c(1,0),
+          legend.justification.inside=c(1,0)) +
+    labs(color=NULL) +
+    scale_x_continuous(breaks=seq(0,10000,2000)) +
+    #scale_y_log10()+
+    scale_color_brewer(palette="Set1")+
+    xlab("Rank of Total Score") + ylab("Worst Objective Score")
+  
+  
+   all_scores %>% 
+    filter(!bloodless)%>%
+    group_by(param_set,round) %>% 
+    mutate(score=sum(weighted_ll),
+              worst=max(weighted_ll)) %>%
+    ungroup() %>%
+    filter(worst==weighted_ll) %>% 
+    mutate(score_rank=rank(score)) %>% 
+    ggplot(aes(x=score,y=worst)) +
+    theme_minimal(base_size=14) +
+    geom_point(aes(color=metric))  +
+    facet_wrap(~site) +
+    theme(legend.position = c(1,0),
+          legend.justification.inside=c(1,0)) +
+    labs(color=NULL) +
+    #scale_x_continuous(breaks=seq(0,10000,2000)) +
+    scale_x_log10() + 
+    scale_y_log10()+
+    scale_color_brewer(palette="Set1")+
+    xlab("Total Score") + ylab("Worst Objective Score")
 ```
 
 
@@ -314,7 +362,7 @@ for(i in unique(track_sets$best)){
   labs(color=NULL,fill=NULL, alpha=NULL, linetype=NULL) +
   guides(alpha="none",fill=guide_legend(nrow = 2))+
   xlab("site") + ylab("Worst Objective Score") +
-  coord_cartesian(ylim=c(0,4))+
+  #coord_cartesian(ylim=c(0,4))+
   scale_linetype_manual(values=c(2)) -> bp
   
   bp + theme_minimal(base_size=16) +
@@ -424,7 +472,164 @@ params %>%
   ggsave(paste(parameters_folder,"unit_values.png",sep='/'),pp,height = 12,width=10)
 ```
 
+
+```{r}
+
+### this section of code requires that post-calibration lengthscale files have been generated
+### to generate: run from /simulations post_calibration_analysis.py with length_scales_by_objective = True
+
+ls_list <- list.files(glue("output/",exp,"/performance/GP"))
+ls_list <- ls_list[grepl("LS",ls_list)]
+
+if(length(ls_list)>1){  # Skip if post_calibration_analysis hasn't generated <site>-<metric>-LS files
+
+  for(ls in ls_list){
+    if(!(exists("LS"))){
+      LS <- read.csv(glue(GP_folder,'/',ls))
+    } else {
+      tmp <- read.csv(glue(GP_folder,'/',ls))
+      LS <- rbind.data.frame(LS,tmp)
+    }
+  }
+  
+  sensitivities <- LS[!duplicated(LS),]
+  
+  pids <- seq(1,max(sensitivities$id))
+  
+  plevels <- c(1,5,10,6,11,12,7,17,
+               8,13,14,15,16,
+               2,3,4,9,18,19,20)
+  
+  sensitivities %>%
+    mutate(site=gsub('.{5}$', '', site))%>%
+    mutate(metric=gsub("gamet_density","gametocytes",metric)) %>%
+    mutate(metric=gsub("asex_density","asexual parasites",metric)) %>%
+    ggplot(aes(x=factor(id,
+                        levels=plevels,labels=gsub("\n","",gsub("-\n"," ",params$parameter[plevels]))),
+               y=paste(substr(metric,1,4),substr(site,1,4),sep=". "))) +
+    geom_tile(color="white",
+              aes(fill=value)) +
+    scale_fill_distiller(palette="RdGy",direction = 1) +
+    #facet_grid(metric~.,scales="free") +
+    xlab("") + ylab("") +
+    theme_minimal(base_size=16)+
+    theme(axis.text.x=element_text(angle=45,hjust=1)) +
+    xlab("") + ylab("") +
+    labs(fill=NULL) 
+  
+  ggsave(paste(GP_folder,"lengthscales.png",sep="/"),width=12,height=8)
+  
+  sensitivities %>%
+    mutate(site=gsub('.{5}$', '', site))%>%
+    mutate(metric=gsub("gamet_density","gametocytes",metric)) %>%
+    mutate(metric=gsub("asex_density","asexual parasites",metric)) %>%
+    mutate(value=percent_rank(value)) %>%
+    ggplot(aes(x=factor(id,levels=plevels,
+                        labels=gsub("\n","",gsub("-\n"," ",params$parameter[plevels]))),
+               y=paste(substr(metric,1,4),'.    ',substr(site,1,4),'.',sep=""))) +
+    geom_tile(color="white",
+              aes(fill=value)) +
+    scale_fill_distiller(palette="RdGy",direction = 1) +
+    #facet_grid(metric~.,scales="free") +
+    xlab("") + ylab("") +
+    theme_minimal(base_size=16) +
+    theme(axis.text.x=element_text(angle=45,hjust=1)) +
+    xlab("") + ylab("") +
+    labs(fill=NULL) 
+  
+  ggsave(paste(GP_folder,"ranked_lengthscales.png",sep="/"),width=12,height=8)
+ 
+  
+  sensitivities %>%
+    #group_by(site,metric) %>%
+    mutate(percentile = percent_rank(value)) %>%
+    ungroup() %>%
+    group_by(metric,id) %>%
+    summarize(value=mean(percentile)) %>%
+    ungroup() %>%
+    mutate(metric=gsub("gamet_density","[gametocytes]",metric)) %>%
+    mutate(metric=gsub("asex_density","[asexual parasites]",metric)) %>%
+    ggplot(aes(x=factor(id,levels=plevels,labels=gsub("\n","",gsub("-\n"," ",params$parameter[plevels]))),
+               y=factor(metric,levels=c("prevalence","[asexual parasites]","[gametocytes]",
+                                        "infectiousness","incidence")))) +
+    theme_minimal(base_size=16) +
+    geom_tile(color="white",
+              aes(fill=value)) +
+    scale_fill_distiller(palette="RdGy",direction = 1) +
+    theme(axis.text.x=element_text(angle=45,hjust=1)) +
+    xlab("") + ylab("") +
+    labs(fill=NULL) +
+    coord_fixed()
+  
+  ggsave(paste(GP_folder,"average_ranked_lengthscales.png",sep="/"),width=10,height=6)
+  
+  sensitivities %>%
+    ungroup() %>%
+    mutate(metric=gsub("gamet_density","[gametocytes]",metric)) %>%
+    mutate(metric=gsub("asex_density","[asexual parasites]",metric)) %>%
+    ggplot(aes(y=factor(id,levels=plevels,labels=gsub("\n","",gsub("-\n"," ",params$parameter[plevels]))),
+               x=interaction(site,factor(metric,levels=c("prevalence","[asexual parasites]","[gametocytes]",
+                                        "infectiousness","incidence"))))) +
+    theme_minimal(base_size=16) +
+    scale_fill_distiller(palette="RdGy",direction = 1) +
+    theme(axis.text.x=element_text(angle=45,hjust=1)) +
+    xlab("") + ylab("") +
+    labs(fill=NULL) +
+    #coord_fixed() +
+    geom_point(aes(size=1/value,
+                   alpha=1/value,
+                   color=metric)) +
+    scale_size_continuous(breaks = c(0.1,0.5,1,2,4,6,8))
+    
+}
+```
+
+
 ### plotting vs. data 
+
+```{r}
+##### Severe Disease Plots #####
+
+## Absolute Incidence ##
+# Load selected simulation outputs
+ddmp <- track_sets %>% filter(metric %in% c("severe_incidence"))
+for(i in 1:nrow(ddmp))
+{
+  
+  tmp <- read.csv(paste("output/",exp,"/LF_",ddmp$round[i],
+                 "/SO/",ddmp$site[i],"/inc_prev_data_full.csv",sep=''))
+  tmp %>% right_join(ddmp[i,]) -> tmp
+  if(i==1){
+    inc_df <- tmp 
+  } else {
+    inc_df <- rbind.data.frame(inc_df,tmp)
+  }
+}
+# Read in reference data
+inc_ref <-read.csv("../reference_datasets/snow_severe_absolute_incidence.csv")
+eirs <- read.csv("../simulation_inputs/monthly_eirs/eir_by_site.csv")
+
+eirs %>% gather("Site","eir",-c("month")) %>% group_by(Site) %>% summarize(annual_eir=sum(eir)) -> eirs
+
+# Plot
+inc_df %>%
+  left_join(eirs) %>%
+  ggplot(aes(x=Age)) +
+  scale_x_continuous(breaks=seq(0,10,1)) +
+  facet_wrap(~paste(gsub('.{5}$', '', Site)," (EIR = ",annual_eir,")",sep=""),ncol=2,scales="free_y") +
+  geom_line(aes(group=interaction(param_set,round,Run_Number),
+                color=paste("Round",round,"#",param_set),
+                y=Severe.Incidence*1000)) +
+  geom_point(data=inc_ref %>% left_join(eirs), aes(x=Age,y=absolute_severe_incidence*1000,
+                               shape="Reference")) +
+  labs(color=NULL,fill=NULL,shape=NULL) +
+  theme_minimal(base_size=14) +
+  theme(legend.position=c(1,0),
+        legend.justification = c(1.1,0.25)) +
+  ylab("Severe disease incidence (per 1,000)")
+
+```
+
 
 
 ```{r}
@@ -592,7 +797,7 @@ ddmp <- track_sets %>% filter(site %in% incidence_sites)
 for(i in 1:nrow(ddmp))
 {
   
-  tmp <- read.csv(paste("..output/",exp,"/LF_",ddmp$round[i],
+  tmp <- read.csv(paste("output/",exp,"/LF_",ddmp$round[i],
                  "/SO/",ddmp$site[i],"/inc_prev_data_final.csv",sep=''))
   tmp %>% right_join(ddmp[i,]) -> tmp
   if(i==1){
@@ -657,8 +862,6 @@ for(s in unique(inc_df$site)){
   print(pp)
   ggsave(paste(objectives_folder,paste(s,"incidence.png",sep="_"),sep='/'),pp,height = 6,width=6)
 }
-
-
 
 remove(inc_df)
 ```
@@ -981,112 +1184,3 @@ for(s in inf_sites[which(inf_sites %in% inf_df$Site)]){
 
 remove(inf_df)
 ```
-
-
-```{r}
-
-### this section of code requires that post-calibration lengthscale files have been generated
-### to generate: run from /simulations post_calibration_analysis.py with length_scales_by_objective = True
-
-ls_list <- list.files(glue("output/",exp,"/performance/GP"))
-ls_list <- ls_list[grepl("LS",ls_list)]
-
-if(length(ls_list)>1){
-
-  for(ls in ls_list){
-    if(!(exists("LS"))){
-      LS <- read.csv(glue(GP_folder,'/',ls))
-    } else {
-      tmp <- read.csv(glue(GP_folder,'/',ls))
-      LS <- rbind.data.frame(LS,tmp)
-    }
-  }
-  
-  sensitivities <- LS[!duplicated(LS),]
-  
-  pids <- seq(1,max(sensitivities$id))
-  
-  plevels <- c(1,5,10,6,11,12,7,17,
-               8,13,14,15,16,
-               2,3,4,9,18,19,20)
-  
-  sensitivities %>%
-    mutate(site=gsub('.{5}$', '', site))%>%
-    mutate(metric=gsub("gamet_density","gametocytes",metric)) %>%
-    mutate(metric=gsub("asex_density","asexual parasites",metric)) %>%
-    ggplot(aes(x=factor(id,levels=plevels,labels=gsub("Base ","",params$parameter[plevels])),
-               y=paste(substr(metric,1,4),substr(site,1,4),sep=". "))) +
-    geom_tile(color="white",
-              aes(fill=value)) +
-    scale_fill_distiller(palette="RdGy",direction = 1) +
-    #facet_grid(metric~.,scales="free") +
-    xlab("") + ylab("") +
-    theme_minimal(base_size=16)+
-    theme(axis.text.x=element_text(angle=45,hjust=1)) +
-    xlab("") + ylab("") +
-    labs(fill=NULL) 
-  
-  ggsave(paste(GP_folder,"lengthscales.png",sep="/"),width=12,height=8)
-  
-  sensitivities %>%
-    mutate(site=gsub('.{5}$', '', site))%>%
-    mutate(metric=gsub("gamet_density","gametocytes",metric)) %>%
-    mutate(metric=gsub("asex_density","asexual parasites",metric)) %>%
-    mutate(value=percent_rank(value)) %>%
-    ggplot(aes(x=factor(id,levels=plevels,labels=gsub("Base ","",params$parameter[plevels])),
-               y=paste(substr(metric,1,4),'.    ',substr(site,1,4),'.',sep=""))) +
-    geom_tile(color="white",
-              aes(fill=value)) +
-    scale_fill_distiller(palette="RdGy",direction = 1) +
-    #facet_grid(metric~.,scales="free") +
-    xlab("") + ylab("") +
-    theme_minimal(base_size=16) +
-    theme(axis.text.x=element_text(angle=45,hjust=1)) +
-    xlab("") + ylab("") +
-    labs(fill=NULL) 
-  
-  ggsave(paste(GP_folder,"ranked_lengthscales.png",sep="/"),width=12,height=8)
- 
-  
-  sensitivities %>%
-    #group_by(site,metric) %>%
-    mutate(percentile = percent_rank(value)) %>%
-    ungroup() %>%
-    group_by(metric,id) %>%
-    summarize(value=mean(percentile)) %>%
-    ungroup() %>%
-    mutate(metric=gsub("gamet_density","[gametocytes]",metric)) %>%
-    mutate(metric=gsub("asex_density","[asexual parasites]",metric)) %>%
-    ggplot(aes(x=factor(id,levels=plevels,labels=gsub("\n","",gsub("-\n"," ",params$parameter[plevels]))),
-               y=factor(metric,levels=c("prevalence","[asexual parasites]","[gametocytes]",
-                                        "infectiousness","incidence")))) +
-    theme_minimal(base_size=16) +
-    geom_tile(color="white",
-              aes(fill=value)) +
-    scale_fill_distiller(palette="RdGy",direction = 1) +
-    theme(axis.text.x=element_text(angle=45,hjust=1)) +
-    xlab("") + ylab("") +
-    labs(fill=NULL) +
-    coord_fixed()
-  
-  ggsave(paste(GP_folder,"average_ranked_lengthscales.png",sep="/"),width=10,height=6)
-    
-}
-```
-
-```{r,eval=F,include=F}
-
-severe %>% 
-  ggplot(aes(x=Age,y=cumulative_severe_incidence*1000)) +
-  scale_x_continuous(breaks = unique(severe$Age)) +
-  ylab("Cumulative rate of severe malaria\n(per 1,000 children)") +
-  geom_line(aes(group=Site)) +
-  geom_point(aes(shape=Site),size=2) +
-  labs(shape=NULL)+
-  theme_minimal(base_size=14)# +
-  theme(legend.position=c(0.05,1),legend.justification = c(0,1),
-        legend.background =element_rect(fill="white",color="transparent"))
-  
-
-```
-
