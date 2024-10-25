@@ -19,9 +19,6 @@ Includes basic batch generators using the various acquisition functions. Expecte
 * turbo_upper_confidence_bound
 * upper_confidence_bound
 
-### create_plots
-
-A mixed bag of helper scripts for coordinating relationships, reference sites, likelihood calculators, etc. Also includes some archival scripts from model validation workflow for plotting and generating the comparisons. This folder likely needs some cleanup and may not currently be used in the workflow.
 
 ### emulators
 
