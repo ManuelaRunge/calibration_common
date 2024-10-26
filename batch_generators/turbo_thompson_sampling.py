@@ -99,7 +99,7 @@ class TurboThompsonSampling(BatchGenerator):
 
     def update(self, X, Y):
         Y = torch.transpose(Y,0,1)
-        print(Y.shape)
+        #print(Y.shape)
         # print(self.failure_counter, self.failure_tolerance)
         if Y.dim()>1:
             print("Multi Obj.", flush=True)
@@ -249,7 +249,7 @@ class TurboThompsonSampling(BatchGenerator):
         #         self.success_counter+=1
         #         
         # else:
-        print("Single Obj", flush=True)
+        #print("Single Obj", flush=True)
         Y = torch.sum(Y, dim=1)
         if max(Y).item() > self.y_max: # 1e-3
             self.success_counter += 1
@@ -265,24 +265,24 @@ class TurboThompsonSampling(BatchGenerator):
             self.length /= 2.0
             self.failure_counter = 0
             
-        print("Successes", flush=True)
-        print(self.success_counter, flush=True)
+        #print("Successes", flush=True)
+        #print(self.success_counter, flush=True)
         
-        print("Failures", flush=True)
-        print(self.failure_counter, flush=True)
+        #print("Failures", flush=True)
+        #print(self.failure_counter, flush=True)
 
         # else:
-        print("Y", flush=True)
+        #print("Y", flush=True)
         #print(Y)
-        print("Y min:", flush=True)
-        print(min(Y).item(), flush=True)
-        print("Y max:", flush=True)
-        print(max(Y).item(), flush=True)
-        print("self.ymax:", flush=True)
+        #print("Y min:", flush=True)
+        #print(min(Y).item(), flush=True)
+        #print("Y max:", flush=True)
+        #print(max(Y).item(), flush=True)
+        #print("self.ymax:", flush=True)
         self.y_max = max(self.y_max, max(Y).item())
-        print(self.y_max, flush=True)
+        #print(self.y_max, flush=True)
 
-        print("Turbo length: ", self.length, flush=True)
+        #print("Turbo length: ", self.length, flush=True)
         # # Force re-exploration after shrinking 6+ times
         # if self.length < 0.001:
         #     self.length = 0.5
@@ -305,11 +305,11 @@ class TurboThompsonSampling(BatchGenerator):
         #     thompson_sampling = MaxPosteriorSampling(model=model, replacement=False, objective=self.objective)
         #     X_next = thompson_sampling(X_cand, num_samples=2)
         
-        print("Making predictions...",flush=True)
+        #print("Making predictions...",flush=True)
         model.eval()
         model.likelihood.eval()
-        print("GC check",flush=True)
-        print(Counter((t.shape for t in gc.get_objects() if isinstance(t, torch.Tensor))), flush=True)
+        #print("GC check",flush=True)
+        #print(Counter((t.shape for t in gc.get_objects() if isinstance(t, torch.Tensor))), flush=True)
         #exit(1)
         with torch.no_grad(), gpytorch.settings.max_cholesky_size(10000):
             predictions = model.likelihood(model(X_cand.to(torch.double)))

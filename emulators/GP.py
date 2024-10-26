@@ -58,13 +58,13 @@ class ExactGP(GP):
     def fit(self, X, Y):
         self.X = X
         self.Y = Y
-        print(f"X shape: {X.shape}", flush=True)
-        print(f"Y shape: {Y.shape}", flush=True)
+        #print(f"X shape: {X.shape}", flush=True)
+        #print(f"Y shape: {Y.shape}", flush=True)
        # Y = torch.transpose(Y,0,1)
        # print(f"Y shape: {Y.shape}", flush=True)
         if self.objective is not None:
             Y = self.objective(Y).unsqueeze(1)
-            print(f"Y shape: {Y.shape}", flush=True)
+            #print(f"Y shape: {Y.shape}", flush=True)
             
         likelihood = GaussianLikelihood(noise_constraint=self.noise_constraint)
         

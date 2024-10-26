@@ -160,26 +160,26 @@ class BO:
 
     # Run an full optimization loop
     def run(self):
-        print("run", flush=True)
-        print(f"X length {len(self.X)}", flush=True)
-        print(f"max eval {self.max_evaluations}", flush=True)
-        print(f"stop con {self.stopping_condition}", flush=True)
+        #print("run", flush=True)
+        #print(f"X length {len(self.X)}", flush=True)
+        #print(f"max eval {self.max_evaluations}", flush=True)
+        #print(f"stop con {self.stopping_condition}", flush=True)
         if self.read_checkpoint(checkpointdir=self.checkpointdir) is False or self.n_init is None:
             print("Error: BO is not initialized.\nRun init() before run().", flush=True)
             return
-        print(f"Continue? {(len(self.X) < self.max_evaluations) and not self.stopping_condition}", flush=True)
+        #print(f"Continue? {(len(self.X) < self.max_evaluations) and not self.stopping_condition}", flush=True)
         while (len(self.X) < self.max_evaluations) and not self.stopping_condition:
-            print("empty cache", flush=True)
+            #print("empty cache", flush=True)
             if self.device == "cuda":
                 torch.cuda.empty_cache()
-            print("take next step...", flush=True)    
+            #print("take next step...", flush=True)    
             self.step()
             self.write_checkpoint(checkpointdir=self.checkpointdir)
-            print(f"{len(self.X)}) Best value: {self.objective(self.Y).max():.2e}", flush=True)
+            #print(f"{len(self.X)}) Best value: {self.objective(self.Y).max():.2e}", flush=True)
             #print(f"{len(self.X)}) Best value: {self.X(self.Y).max()}", flush=True)
     
     def step(self):
-        print("step", flush=True)
+        #print("step", flush=True)
         X = self.X
         Y = self.Y
       
@@ -190,7 +190,7 @@ class BO:
         
         # Create batch
         tic = time.perf_counter()
-        print("batch time", flush=True)
+        #print("batch time", flush=True)
         X_next = self.batch_generator.generate_batch(model=self.model.model, X=X, Y=Y)
         if self.batch_generator.stopping_condition:
             self.stopping_condition = True
