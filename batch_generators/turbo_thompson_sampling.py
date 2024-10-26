@@ -96,7 +96,7 @@ class TurboThompsonSampling(BatchGenerator):
             
         if self.success_tolerance is None:
             self.success_tolerance = 8
-            )
+            
         else:
             self.success_tolerance = success_tolerance
 
