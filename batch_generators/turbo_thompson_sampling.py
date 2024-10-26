@@ -42,7 +42,7 @@ class TurboThompsonSampling(BatchGenerator):
     failure_counter: int = 0
     failure_tolerance: int = float("nan")  # Note: Post-initialized
     success_counter: int = 0
-    success_tolerance: int = 8 # 10 #10  # Note: The original paper uses 3
+    success_tolerance: int = float("nan")  # Note: Post-initialized # Note: The original paper uses 3
     y_max: float = -float("inf")
     y1_max: float = -float("inf")
     y2_max: float = -float("inf")
@@ -76,7 +76,7 @@ class TurboThompsonSampling(BatchGenerator):
     dtype = None
     device = None
 
-    def __init__(self, dim=1, batch_size=4, failure_tolerance = None, n_candidates=None, objective=IdentityMCMultiOutputObjective(), dtype=torch.double, device=torch.device("cpu"), length_min=2**-30):
+    def __init__(self, dim=1, batch_size=4, failure_tolerance = None, success_tolerance = None, n_candidates=None, objective=IdentityMCMultiOutputObjective(), dtype=torch.double, device=torch.device("cpu"), length_min=2**-30):
         super().__init__()
         self.dim = dim
         self.batch_size = batch_size
@@ -93,6 +93,12 @@ class TurboThompsonSampling(BatchGenerator):
             )
         else:
             self.failure_tolerance = failure_tolerance
+            
+        if self.success_tolerance is None:
+            self.success_tolerance = 8
+            )
+        else:
+            self.success_tolerance = success_tolerance
 
         if self.n_candidates is None:
             self.n_candidates = min(5000, max(2000, 200 * self.dim))
