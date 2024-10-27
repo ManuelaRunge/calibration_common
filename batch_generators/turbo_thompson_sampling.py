@@ -93,8 +93,9 @@ class TurboThompsonSampling(BatchGenerator):
             self.failure_counter = 0
         
         self.y_max = max(self.y_max, max_score)
-        
-            
+        print(max_score)
+        print(type(max_score))
+        exit(1)    
         if self.length < self.length_min:
             self.stopping_condition = True
 
@@ -124,66 +125,6 @@ class TurboThompsonSampling(BatchGenerator):
         o = indices[-self.batch_size:].numpy().tolist()
         X_next = X_cand[o]
         return X_next
-    
-    def _create_candidates2(self, model, X, Y):
-
-        assert (X.min() >= 0.0 and X.max() <= 1.0 and torch.all(torch.isfinite(Y))) or X.min() == -1.0
-        X[X==-1.0]=0.0
-        YO = self.objective(Y)
-        print("YO",flush=True)
-        print(YO.shape,flush=True)
-        YT = torch.transpose(YO,0,1)
-        print("YT",flush=True)
-        print(YT.shape,flush=True)
-        self.update(X, YT)
-        if self.stopping_condition:
-            return
-        # Scale the TR to be proportional to the lengthscales
-        yy = YT.sum(dim=1).numpy().tolist()
-        print("yy",flush=True)
-        print(yy,flush=True)
-        x_center = X[yy.index(max(yy)), :].clone()
-        print("x_center",flush=True)
-        print(x_center,flush=True)
-        weights = torch.ones(X.shape[-1])
-
-        try:
-            weights = model.covar_module.base_kernel.lengthscale.squeeze().detach()
-        except Exception as e:
-            try:
-                weights = model.covar_module.data_covar_module.lengthscale.squeeze().detach()
-            except Exception as e:
-                pass
-       
-        weights = weights / weights.mean()
-        # pdb.set_trace()
-        if len(weights.shape) == 0: weights = weights.unsqueeze(-1)
-
-        weights = weights / torch.prod(weights.pow(1.0 / len(weights)))
-        tr_lb = torch.clamp(x_center - weights * self.length / 2.0, 0.0, 1.0)
-        tr_ub = torch.clamp(x_center + weights * self.length / 2.0, 0.0, 1.0)
-
-        dim = X.shape[-1]
-        sobol = SobolEngine(dim, scramble=True)
-        pert = sobol.draw(self.n_candidates).to(dtype=self.dtype, device=self.device)
-        pert = tr_lb + (tr_ub - tr_lb) * pert
-
-        # Create a perturbation mask
-        prob_perturb = min(20.0 / dim, 1.0)
-        mask = (
-            torch.rand(self.n_candidates, dim, dtype=self.dtype, device=self.device)
-            <= prob_perturb
-        )
-        ind = torch.where(mask.sum(dim=1) == 0)[0]
-        if len(ind) > 0:
-            mask[ind, torch.randint(0, dim - 1, size=(len(ind),), device=self.device)] = 1
-
-        # Create candidate points from the perturbations and the mask        
-        X_cand = x_center.expand(self.n_candidates, dim).clone()
-        X_cand[mask] = pert[mask]
-        print("X_cand",flush=True)
-        print(X_cand.shape,flush=True)
-        return X_cand
    
     def _create_candidates(self, model, X, Y):
         
@@ -236,78 +177,6 @@ class TurboThompsonSampling(BatchGenerator):
 
         return X_cand
       
-      
-    def _create_candidates3(self, model, X, Y):
-        print("creating candidates...", flush=True)
-        assert X.min() >= 0.0 and X.max() <= 1.0 and torch.all(torch.isfinite(Y))
-        print("X")
-        print(X.shape)
-        YO = self.objective(Y)
-        print("YO",flush=True)
-        print(YO.shape,flush=True)
-        print("Updating TTS...",flush=True)
-        self.update(X, YO)
-        
-        if self.stopping_condition:
-            return
-        
-        if YO.dim()>1 and YO.shape[-1] > 1:
-            print("collapsing objectives...")
-            YO=torch.sum(YO,dim=0)
-            
-        print("YO",flush=True)
-        print(YO.shape,flush=True) 
-        
-        print("Scaling TR...",flush=True)
-        
-        # Scale the TR to be proportional to the lengthscales
-        YO=YO.numpy().tolist()
-        x_center = X[YO.index(min(YO)), :].clone()
-        print("x_center")
-        print(x_center)
-        weights = torch.ones(X.shape[-1])
-
-        try:
-            weights = model.covar_module.base_kernel.lengthscale.squeeze().detach()
-        except Exception as e:
-            try:
-                weights = model.covar_module.data_covar_module.lengthscale.squeeze().detach()
-            except Exception as e:
-                pass
-       
-        weights = weights / weights.mean()
-        # pdb.set_trace()
-        if len(weights.shape) == 0: weights = weights.unsqueeze(-1)
-
-        weights = weights / torch.prod(weights.pow(1.0 / len(weights)))
-        tr_lb = torch.clamp(x_center - weights * self.length / 2.0, 0.0, 1.0)
-        tr_ub = torch.clamp(x_center + weights * self.length / 2.0, 0.0, 1.0)
-        print(f"bounds: {tr_lb.shape}")
-        dim = X.shape[-1]
-        sobol = SobolEngine(dim, scramble=True)
-        pert = sobol.draw(self.n_candidates).to(dtype=self.dtype, device=self.device)
-        print(f"pert: {pert.shape}")
-        tr_lb = torch.transpose(tr_lb,0,1)
-        tr_ub = torch.transpose(tr_ub,0,1)
-        pert = torch.transpose(pert,0,1)
-        pert = tr_lb + (tr_ub - tr_lb) * pert
-        pert = torch.transpose(pert,0,1)
-        print("Creating Mask...",flush=True)
-        # Create a perturbation mask
-        prob_perturb = min(20.0 / dim, 1.0)
-        mask = (
-            torch.rand(self.n_candidates, dim, dtype=self.dtype, device=self.device)
-            <= prob_perturb
-        )
-        ind = torch.where(mask.sum(dim=1) == 0)[0]
-        if len(ind) > 0:
-            mask[ind, torch.randint(0, dim - 1, size=(len(ind),), device=self.device)] = 1
-
-        print("Creating candidates from mask...",flush=True)
-        X_cand = x_center.expand(self.n_candidates, dim).clone()
-        X_cand[mask] = pert[mask]
-
-        return X_cand
 
     def write_checkpoint(self, checkpointdir):
         with open(checkpointdir + "/TurboThompson.json", "w") as statefile:
