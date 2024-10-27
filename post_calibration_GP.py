@@ -1,5 +1,5 @@
 import os, sys, shutil
-sys.path.append('/projects/b1139/environments/emod_torch_tobias/lib/python3.8/site-packages/')
+#sys.path.append('/projects/b1139/environments/emod_torch_tobias/lib/python3.8/site-packages/')
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np

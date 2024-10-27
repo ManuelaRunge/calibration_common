@@ -12,6 +12,6 @@
 
 
 module purge all
-source activate /projects/b1139/environments/emod_torch_tobias
+source activate /projects/b1139/environments/emodpy-torch
 
 python post_calibration_analysis.py --experiment '241013_20_max_infections' --prediction_plot --exclude_count 1000 --timer_plot --length_scales_plot --length_scales_by_objective
