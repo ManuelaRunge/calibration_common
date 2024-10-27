@@ -92,10 +92,7 @@ class TurboThompsonSampling(BatchGenerator):
             self.length /= 2.0
             self.failure_counter = 0
         
-        self.y_max = max(self.y_max, max_score)
-        print(max_score)
-        print(type(max_score))
-        exit(1)    
+        self.y_max = max(self.y_max, max_score.item())
         if self.length < self.length_min:
             self.stopping_condition = True
 
