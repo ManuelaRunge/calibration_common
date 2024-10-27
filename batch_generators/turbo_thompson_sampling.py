@@ -77,8 +77,8 @@ class TurboThompsonSampling(BatchGenerator):
 
     def update(self, X, Y):
         Y = torch.transpose(Y,0,1)
-        #Y = torch.sum(Y, dim=1)
-        if max(Y).item() > self.y_max: # 1e-3
+        max_score = torch.max(Y)
+        if max_score.item() > self.y_max: # 1e-3
             self.success_counter += 1
             self.failure_counter = 0
         else:
