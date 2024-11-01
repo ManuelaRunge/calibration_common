@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import itertools
 import sys
-from post_calibration_GP import fit_GP_to_objective, get_script_path
+from post_calibration_GP import fit_GP_to_objective, get_script_path, fit_GP_to_environment_objective
 import argparse
   
 herepath = get_script_path()
@@ -105,7 +105,7 @@ def plot_length_scales(experiment=''):
     plt.savefig(os.path.join(herepath,'output',experiment,"performance/GP/length_scales.pdf"))  
     return
 
-def post_calibration_analysis(experiment='',length_scales_by_objective=True,length_scales_plot=True,prediction_plot=True,exclude_count=0,timer_plot=True):
+def post_calibration_analysis(experiment='',length_scales_by_objective=True,length_scales_by_environment_objective=True,length_scales_plot=True,prediction_plot=True,exclude_count=0,timer_plot=True):
                                 
     os.makedirs("/".join((herepath,"output",experiment,"performance","GP")),exist_ok=True)
     print(" ".join(("Loading botorch objects for experiment",experiment)))
@@ -129,6 +129,23 @@ def post_calibration_analysis(experiment='',length_scales_by_objective=True,leng
             metric = row['metric']
             # Fit single task GP to single site-metric objective
             fit_GP_to_objective(exp=experiment,site=site,metric=metric)
+            
+    if length_scales_by_environment_objective:
+        # Fit single-task GP  to all site-metric objectives in all_scores.csv
+        scores = pd.read_csv(os.path.join(herepath,'output',experiment,'all_LL.csv'))
+        # Get unique scoretypes scores dataframe
+        ps = scores['param_set']
+        r = scores['round']
+        scores = scores.filter(like='_score')
+        scores['param_set']=ps
+        scores['round']=r
+        scores = pd.melt(scores,id_vars=["param_set","round"])
+        unique_combinations = scores[['variable']].drop_duplicates()
+        unique_combinations = unique_combinations['variable'].to_list()
+        # Iterate over unique combinations
+        for st in unique_combinations:
+            print(f"Getting length scales from GP fit to {st}...")
+            fit_GP_to_environment_objective(exp=experiment,scoretype=st)
     return
    
 
@@ -140,7 +157,9 @@ if __name__=="__main__":
     # Add arguments
     parser.add_argument('--experiment', type=str, required=True, help='Experiment label')
     parser.add_argument('--length_scales_by_objective', default=False, action='store_true', 
-                        help='Whether to calculate length scales by objective')
+                        help='Whether to calculate length scales by within-host objective')
+    parser.add_argument('--length_scales_by_environment_objective', default=False, action='store_true', 
+                        help='Whether to calculate length scales by environment objective')
     parser.add_argument('--length_scales_plot', default=False,action='store_true', 
                         help='Whether to plot length scales')
     parser.add_argument('--prediction_plot', default=False,action='store_true',  
@@ -157,6 +176,7 @@ if __name__=="__main__":
     post_calibration_analysis(
         experiment=args.experiment,
         length_scales_by_objective=args.length_scales_by_objective,
+        length_scales_by_environment_objective=args.length_scales_by_environment_objective,
         length_scales_plot=args.length_scales_plot,
         prediction_plot=args.prediction_plot,
         exclude_count=args.exclude_count,
