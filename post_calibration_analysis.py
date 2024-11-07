@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 import itertools
 import sys
-from post_calibration_GP import fit_GP_to_objective, get_script_path, fit_GP_to_environment_objective
+sys.path.append("./")
+from .post_calibration_GP import fit_GP_to_objective, get_script_path, fit_GP_to_environment_objective
 import argparse
   
 herepath = get_script_path()
