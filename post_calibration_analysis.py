@@ -106,7 +106,7 @@ def plot_length_scales(experiment=''):
     plt.savefig(os.path.join(herepath,'output',experiment,"performance/GP/length_scales.pdf"))  
     return
 
-def post_calibration_analysis(experiment='',length_scales_by_objective=True,length_scales_by_environment_objective=True,length_scales_plot=True,prediction_plot=True,exclude_count=0,timer_plot=True):
+def post_calibration_analysis(experiment='',length_scales_by_objective=True,length_scales_by_environment_objective=True,length_scales_plot=True,prediction_plot=True,exclude_count=0,timer_plot=True,n_prior=1):
                                 
     os.makedirs("/".join((herepath,"output",experiment,"performance","GP")),exist_ok=True)
     print(" ".join(("Loading botorch objects for experiment",experiment)))
@@ -129,7 +129,7 @@ def post_calibration_analysis(experiment='',length_scales_by_objective=True,leng
             site = row['site']
             metric = row['metric']
             # Fit single task GP to single site-metric objective
-            fit_GP_to_objective(exp=experiment,site=site,metric=metric)
+            fit_GP_to_objective(exp=experiment,site=site,metric=metric,n_prior=n_prior)
             
     if length_scales_by_environment_objective:
         # Fit single-task GP  to all site-metric objectives in all_scores.csv

@@ -21,7 +21,7 @@ def get_script_path():
     return os.path.dirname(os.path.realpath(sys.argv[0]))
 
 
-def fit_GP_to_objective(exp='',site='',metric=''):
+def fit_GP_to_objective(exp='',site='',metric='',n_prior):
     path_to_here = get_script_path()
     # skip no_blood objectives
     if(metric=="no_blood"):
@@ -57,7 +57,7 @@ def fit_GP_to_objective(exp='',site='',metric=''):
     # Convert to unique parameter_set ids
     ids = unique_combinations['param_set'] + unique_combinations['round']*batch_size
     ids = ids.values.tolist()
-    ids=ids + [1]
+    ids=ids + [x+1 for x in list(range(n_prior))]
     ids = np.unique(ids)
     ids = [int(i) for i in ids]
 
