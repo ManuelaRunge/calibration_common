@@ -21,7 +21,7 @@ def get_script_path():
     return os.path.dirname(os.path.realpath(sys.argv[0]))
 
 
-def fit_GP_to_objective(exp='',site='',metric='',n_prior):
+def fit_GP_to_objective(exp='',site='',metric='',n_prior=0):
     path_to_here = get_script_path()
     # skip no_blood objectives
     if(metric=="no_blood"):

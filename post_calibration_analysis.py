@@ -106,7 +106,7 @@ def plot_length_scales(experiment=''):
     plt.savefig(os.path.join(herepath,'output',experiment,"performance/GP/length_scales.pdf"))  
     return
 
-def post_calibration_analysis(experiment='',length_scales_by_objective=True,length_scales_by_environment_objective=True,length_scales_plot=True,prediction_plot=True,exclude_count=0,timer_plot=True,n_prior=1):
+def post_calibration_analysis(experiment='',length_scales_by_objective=True,length_scales_by_environment_objective=True,length_scales_plot=True,prediction_plot=True,exclude_count=0,timer_plot=True,n_prior=0):
                                 
     os.makedirs("/".join((herepath,"output",experiment,"performance","GP")),exist_ok=True)
     print(" ".join(("Loading botorch objects for experiment",experiment)))
