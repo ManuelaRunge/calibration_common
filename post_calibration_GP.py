@@ -123,7 +123,8 @@ def fit_GP_to_environment_objective(exp='',scoretype=''):
     r = Y['round']
     Y['param_set']=ps
     Y['round']=r
-    Y = pd.melt(Y,id_vars=["param_set","round"],value_vars=['eir_score','shape_score','intensity_score','prevalence_score'])
+    # Y = pd.melt(Y,id_vars=["param_set","round"],value_vars=['eir_score','shape_score','intensity_score','prevalence_score','prevalence_U2_score'])
+    Y = pd.melt(Y,id_vars=["param_set","round"],value_vars=['eir_score','shape_score','prevalence_score','prevalence_U2_score'])
     #print(Y)
     results = []
     # Getting unique combinations of 'round' and 'parameter'
