@@ -116,17 +116,17 @@ class BO:
                 X = torch.cat((X, bX.to(dtype=self.dtype, device=self.device)), axis=0)
                 Y = torch.cat((Y, bY.to(dtype=self.dtype, device=self.device)), axis=0)
 
-            self.X = X#torch.tensor(X, dtype=self.dtype, device=self.device)
-            self.Y = Y#torch.tensor(Y, dtype=self.dtype, device=self.device)#.unsqueeze(-1)
-            self.length_scales = torch.full((1, X.shape[-1]), torch.nan, dtype=self.dtype, device=self.device)
-            self.Y_pred_mean = torch.tensor([[torch.nan for i in range(self.Y.shape[-1])] for j in range(self.n_init)], dtype=self.dtype, device=self.device)
-            self.Y_pred_var = torch.tensor([[torch.nan for i in range(self.Y.shape[-1])] for j in range(self.n_init)], dtype=self.dtype, device=self.device)
-            self.iterations = torch.tensor([0]).repeat(self.n_init)
-            self.timer_model = torch.tensor([], dtype=self.dtype, device=self.device).float()
-            self.timer_batch_generator = torch.tensor([], dtype=self.dtype, device=self.device).float()
-
-            self.write_checkpoint(checkpointdir=self.checkpointdir)
-            print(f"{len(self.X)}) Best value: {self.objective(self.Y).max():.2e}", flush=True)
+                self.X = X#torch.tensor(X, dtype=self.dtype, device=self.device)
+                self.Y = Y#torch.tensor(Y, dtype=self.dtype, device=self.device)#.unsqueeze(-1)
+                self.length_scales = torch.full((1, X.shape[-1]), torch.nan, dtype=self.dtype, device=self.device)
+                self.Y_pred_mean = torch.tensor([[torch.nan for i in range(self.Y.shape[-1])] for j in range(self.n_init)], dtype=self.dtype, device=self.device)
+                self.Y_pred_var = torch.tensor([[torch.nan for i in range(self.Y.shape[-1])] for j in range(self.n_init)], dtype=self.dtype, device=self.device)
+                self.iterations = torch.tensor([0]).repeat(self.n_init)
+                self.timer_model = torch.tensor([], dtype=self.dtype, device=self.device).float()
+                self.timer_batch_generator = torch.tensor([], dtype=self.dtype, device=self.device).float()
+    
+                self.write_checkpoint(checkpointdir=self.checkpointdir)
+                print(f"{len(self.X)}) Best value: {self.objective(self.Y).max():.2e}", flush=True)
 
     def initX(self, initX):
         self.n_init = len(X)

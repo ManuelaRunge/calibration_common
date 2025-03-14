@@ -21,7 +21,8 @@ def get_script_path():
     return os.path.dirname(os.path.realpath(sys.argv[0]))
 
 
-def fit_GP_to_objective(exp='',site='',metric=''):
+
+def fit_GP_to_objective(exp='',site='',metric='',n_prior=0):
     path_to_here = get_script_path()
     # skip no_blood objectives
     if(metric=="no_blood"):
@@ -46,7 +47,6 @@ def fit_GP_to_objective(exp='',site='',metric=''):
     # Load output Y - scores
     Y = pd.read_csv(os.path.join(path_to_here,'output',exp,'all_LL.csv'))
     
-    results = []
     # filter out rows with NULL LL or with no_blood score > 0
     missing_ll_rows = Y[Y['ll'].isnull()]
     bloodless = Y[(Y['ll']>0) & (Y['metric']=="no_blood")]
@@ -58,7 +58,7 @@ def fit_GP_to_objective(exp='',site='',metric=''):
     # Convert to unique parameter_set ids
     ids = unique_combinations['param_set'] + unique_combinations['round']*batch_size
     ids = ids.values.tolist()
-    ids=ids + [1]
+    ids=ids + [x+1 for x in list(range(n_prior))]
     ids = np.unique(ids)
     ids = [int(i) for i in ids]
 
@@ -66,7 +66,8 @@ def fit_GP_to_objective(exp='',site='',metric=''):
     YY = Y[(Y['site'] == site) & (Y['metric'] == metric)]
     YY['ps'] = YY['round'] * batch_size + YY['param_set'] 
     YY=YY[~YY['ps'].isin(ids)]
-    scores = YY['ll'] / YY['baseline']
+    scores = YY['ll'] * YY['my_weight']
+    scores = scores[scores!=0]
     scores=torch.tensor(scores.values).unsqueeze(1)
 
     # Train single-task GP
@@ -89,6 +90,7 @@ def fit_GP_to_objective(exp='',site='',metric=''):
             pass
 
     # Collect values
+    results = []
     for id in range(1, length_scales.shape[1]+1):  # ID from 1 to n_parameters
         value = length_scales[0, id-1].item()  # Get the value from the tensor
         results.append({'metric': metric, 'site': site, 'id': id, 'value': value})

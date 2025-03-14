@@ -172,7 +172,7 @@ def combine_higher_dens_freqs(sim_df_cur, max_ref_dens, max_magnitude_difference
     if max_ref_dens < sim_df_cur['densitybin'].max(skipna=True) / max_magnitude_difference:
         # get sum of frequencies within higher bins
         all_higher_dens = sim_df_cur[sim_df_cur['densitybin'] >= max_ref_dens]
-        sim_agg_higher_dens = all_higher_dens.group_by(['month', 'agebin', 'Site']).agg(
+        sim_agg_higher_dens = all_higher_dens.groupby(['month', 'agebin', 'Site']).agg(
             densitybin=('densitybin', np.nanmin),
             asexual_par_dens_freq=('asexual_par_dens_freq', np.nansum),
             gametocyte_dens_freq=('gametocyte_dens_freq', np.nansum),
