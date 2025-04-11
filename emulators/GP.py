@@ -12,7 +12,8 @@ from botorch.models import FixedNoiseGP, SingleTaskGP
 from botorch.models.multitask import MultiTaskGP, KroneckerMultiTaskGP
 from botorch.models.transforms.outcome import Standardize, Log
 from botorch.fit import fit_gpytorch_model
-from botorch.optim.fit import fit_gpytorch_torch
+#from botorch.optim.fit import fit_gpytorch_torch
+from botorch.fit import fit_gpytorch_model
 
 from gpytorch.constraints import Interval, GreaterThan, LessThan
 from gpytorch.likelihoods import GaussianLikelihood, MultitaskGaussianLikelihood
