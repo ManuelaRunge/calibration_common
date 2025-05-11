@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import json
+from pathlib import Path
 sys.path.append("../")
 import manifest as manifest
 
@@ -32,7 +33,7 @@ def fit_GP_to_objective(exp='',site='',metric='',n_prior=0):
     print(f"site: {site} metric: {metric}",flush=True)
     
     # Load acquisition function details
-    with open(f'{path_to_here}/output/{exp}/TurboThompson.json') as f:
+    with open(Path(f'{path_to_here}/output/{exp}/TurboThompson.json')) as f:
         data = json.load(f)
     df = pd.DataFrame({'value': data})
     
@@ -97,7 +98,7 @@ def fit_GP_to_objective(exp='',site='',metric='',n_prior=0):
 
     # Save results as CSV
     results_df = pd.DataFrame(results)
-    results_df.to_csv(f'{path_to_here}/output/{exp}/performance/GP/{metric}_{site}_LS.csv', index=False)
+    results_df.to_csv(Path(f'{path_to_here}/output/{exp}/performance/GP/{metric}_{site}_LS.csv'), index=False)
     
     return
 
@@ -108,7 +109,7 @@ def fit_GP_to_environment_objective(exp='',scoretype=''):
     print(f"score_type: {scoretype}",flush=True)
     
     # Load acquisition function details
-    with open(f'{path_to_here}/output/{exp}/TurboThompson.json') as f:
+    with open(Path(f'{path_to_here}/output/{exp}/TurboThompson.json')) as f:
         data = json.load(f)
     df = pd.DataFrame({'value': data})
     
@@ -116,10 +117,10 @@ def fit_GP_to_environment_objective(exp='',scoretype=''):
     batch_size=df.at['batch_size', 'value']
     
     # Load input X - parameters
-    X = torch.load(os.path.join(path_to_here,'output',exp,'X.pt'))
+    X = torch.load(Path(os.path.join(path_to_here,'output',exp,'X.pt')))
     
     # Load output Y - scores
-    Y = pd.read_csv(os.path.join(path_to_here,'output',exp,'all_LL.csv'))
+    Y = pd.read_csv(Path(os.path.join(path_to_here,'output',exp,'all_LL.csv')))
     # Reformat scores
     ps = Y['param_set']
     r = Y['round']
@@ -173,7 +174,7 @@ def fit_GP_to_environment_objective(exp='',scoretype=''):
 
     # Save results as CSV
     results_df = pd.DataFrame(results)
-    results_df.to_csv(f'{path_to_here}/output/{exp}/performance/GP/{scoretype}_LS.csv', index=False)
+    results_df.to_csv(Path(f'{path_to_here}/output/{exp}/performance/GP/{scoretype}_LS.csv'), index=False)
     
     return
 
